@@ -2,7 +2,7 @@
 
 Created By: Jacob Taylor Cassady
 
-Contributors: Denny Joy
+Contributor(s): Denny Joy
 
 Microcontroller: Teensy
 
