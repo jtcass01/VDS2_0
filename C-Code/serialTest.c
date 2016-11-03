@@ -10,20 +10,45 @@
   http://robotgrrl.com/blog/2010/01/15/arduino-to-matlab-read-in-sensor-data/
   */
    int ledPin=13;
-   int i = 0;
+   int i = 1;
+   char response = '\0';
    
    void setup() {
      
    // start serial port at 9600 bps:
    Serial.begin(9600);
-   digitalWrite(ledPin,HIGH);
+   
    establishContact();  // send a byte to establish contact until receiver responds
-   digitalWrite(ledPin,LOW);
+   Serial.print("Test");
+   Serial.flush();
  }
 
  void loop() {
- Serial.println(i);
- i=i+1;  
+   if(Serial.available() >= 4){
+     response = Serial.read();
+     
+     if(response == 'B'){
+       Serial.print("B RECIEVED");
+       Serial.flush();
+     }
+     
+     if(response == 'E'){
+       Serial.print("E RECIEVED");
+       Serial.flush();     
+     }
+     
+     /*Serial.write(response);
+     Serial.flush();
+     response = response + 1;
+     Serial.write(response);
+     Serial.flush();
+     delay(1000);*/
+   }
+   
+   /*
+   Serial.println(i);
+   i=i+1;  
+   delay(1000);*/
  }
 
  void establishContact() {
