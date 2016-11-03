@@ -30,6 +30,7 @@ public class SerialCommunication implements SerialPortEventListener{
 	//just a boolean flag that i use for enabling and disabling buttons depending
 	//on whether the program is connected to a serial port or not
 	private boolean bConnected = false;
+	private boolean handShake = false;
 	
 	//the timeout value for connecting with the port
 	final static int TIMEOUT = 2000;
@@ -73,6 +74,14 @@ public class SerialCommunication implements SerialPortEventListener{
 	}
 
 	
+	public void setHandShake(boolean response){
+		if(response == true){
+			System.out.println("Handshake made.");
+		}
+		handShake = response;
+	}
+
+	
 	public void connect(){
 		int response;
 		System.out.println("Here are the ports we found.");
@@ -100,6 +109,7 @@ public class SerialCommunication implements SerialPortEventListener{
 		selectedPortIdentifier = (CommPortIdentifier)portMap.get(selectedPort);
 		
 		CommPort commPort = null;
+		
 		try {
 			//the method below returns an object of type CommPort
 			commPort = selectedPortIdentifier.open("BackendDesign", TIMEOUT);
@@ -116,12 +126,16 @@ public class SerialCommunication implements SerialPortEventListener{
 			/*window.txtLog.setForeground(Color.black);
 			window.txtLog.append(logText + "n");
 			
-			//CODE ON SETTING BAUD RATE ETC OMITTED
-			//XBEE PAIR ASSUMED TO HAVE SAME SETTING ALREADY
-			
 			//enables the controls on the GUI if a successful connection is made
 			window.keybindingController.toggleControls();
-		*/} catch (PortInUseException e){
+			
+			
+			*/
+			
+			this.initIOStream();
+			this.initListener();
+			
+		} catch (PortInUseException e){
 			logText = selectedPort + " is in use. (" + e.toString() + ")";
 			
 			System.out.println(logText);
@@ -136,82 +150,71 @@ public class SerialCommunication implements SerialPortEventListener{
 		}
 	}
 
-	public void serialEvent(SerialPortEvent evt) {
-
-		switch(evt.getEventType()){
-			case SerialPortEvent.BI:
-			case SerialPortEvent.OE:
-			case SerialPortEvent.FE:
-			case SerialPortEvent.PE:
-			case SerialPortEvent.CD:
-			case SerialPortEvent.CTS:
-			case SerialPortEvent.DSR:
-			case SerialPortEvent.RI:
-			case SerialPortEvent.OUTPUT_BUFFER_EMPTY:
-				break;
-			case SerialPortEvent.DATA_AVAILABLE:
-				byte[] readBuffer = new byte[20];
-				
-				try{
-					while(input.available() > 0){
-						int numByte = input.read(readBuffer);
-					}
-					System.out.print(new String(readBuffer));
-				} catch (IOException e){
-					logText = "Failed to read data. (" + e.toString() + ")";
-					System.out.println(logText);
-					System.exit(-1);
-				}
-				break;
+	
+	//open the input and output streams
+	//pre style = "font-size: 11px;": an open port 
+	//post:initialized input and output streams for use to communicate data
+	public boolean initIOStream() {
+		//return value for whether opening the streams is successful or not
+		boolean successful = false;
+		
+		try{
+			input = serialPort.getInputStream();
+			output = serialPort.getOutputStream();
+			writeData('A');
+			
+			//TO DO:::: WRITE DATA (0,0);
+			successful = true;
+			return successful;
+		} catch (IOException e ) {
+			logText = "I/O Streams failed to open. (" + e.toString() + ")";
+			System.out.println(logText);
+			
+			return successful;
 		}
-		/*
+		
+	}
+	
+	public void serialEvent(SerialPortEvent evt) {
+		
 		if(evt.getEventType() == SerialPortEvent.DATA_AVAILABLE){
 			try {
-				System.out.println("Hi");
 				
 				byte singleData = (byte)input.read();
 				
 				
 				if(singleData != NEW_LINE_ASCII){
-					System.out.println("Hi");
 					logText = new String(new byte[] {singleData});
 					System.out.println(logText);
+					if(!handShake && logText.equals("A")){
+						writeData('A');
+						this.setHandShake(true);
+					}
 				} else {
-					System.out.println("Hi");
 					System.out.println("");
 				}
-				System.out.println("Hi");
-	*/			
-	/*			int len = 0;
-			
-				while ((data = input.read()) > -1 && cont);{
-					if (data == '\n'){
-						cont = false;
-					}
-					buffer[len++] = (byte) data;
-				}
-				System.out.print(new String(buffer,0,len));
-	*/			
-					/*
-					byte singleData = (byte)input.read();
-					
-					if(singleData != NEW_LINE_ASCII){
-						logText = new String(new byte[] {singleData});
-						window.txtLog.append(logText);
-					} else {
-						window.txtLog.append("n");
-					}
-				} catch (Exception e) {
-					logText = "Failed to read data. (" + e.toString() + ")";
-					window.txtLog.setForeground(Color.red);
-					window.txtLog.append(logText + "n");
-				}
+
 			} catch (Exception e) {
 				logText = "Failed to read data. (" + e.toString() + ")";
 				System.out.println(logText);
 				System.exit(-1);
-			}*/
+			}
 		}
+	}
+	
+	
+	//method that can be called to send data
+	//pre style="font-size: 11px;": open serial port
+	//post: data sent to the other device
+	public void writeData(int message){
+		try {
+			output.write(message);
+			output.flush();
+		} catch (Exception e) {
+			logText = "Failed to write data. (" + e.toString() + ")";
+		}
+	}
+	
 	
 	//starts the event listener that knows wheneber data is available to be read
 	//pre style ="font-size: 11px;": an open serial port
