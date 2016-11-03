@@ -1,2 +1,4 @@
 Entry - 11/3/2016:
-  I successfully executed a handshake between the C code on the arduino and the Java code on my computer.  Furthermore, I successfully sent/received information from both Java and the arduino.  Also, I used this connection to call two different if statements requiring input from serial.  Please view 
+  I successfully executed a handshake between the C code on the arduino and the Java code on my computer.  Furthermore, I successfully 
+sent/received information from both Java and the arduino.  Also, I used this connection to call two different if statements requiring
+input from serial.  Please view 11.3.2016.png in the log folder for reference.
