@@ -6,12 +6,8 @@ public class BackendDesign {
 		Vector serialPorts = new Vector();
 		
 		serialPorts = test.searchForPorts();
-		
-		for(int i = 0; i<serialPorts.size(); i++){
-			System.out.println(i + ". " + serialPorts.elementAt(i));
-		}
-		
 		test.connect();
-		test.initListener();
+
+		
 	}
 }
