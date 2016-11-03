@@ -2,6 +2,8 @@
 
 Created By: Jacob Taylor Cassady
 
+Contributors: Denny Joy
+
 Microcontroller: Teensy
 
 Language: Java and C
