@@ -31,6 +31,7 @@ public class SerialCommunication implements SerialPortEventListener{
 	//on whether the program is connected to a serial port or not
 	private boolean bConnected = false;
 	private boolean handShake = false;
+	private boolean writing = false;
 	
 	//the timeout value for connecting with the port
 	final static int TIMEOUT = 2000;
@@ -72,6 +73,10 @@ public class SerialCommunication implements SerialPortEventListener{
 	public void setConnected(boolean response){
 		bConnected = response;
 	}
+	
+	public boolean getConnected(){
+		return bConnected;
+	}
 
 	
 	public void setHandShake(boolean response){
@@ -79,6 +84,10 @@ public class SerialCommunication implements SerialPortEventListener{
 			System.out.println("Handshake made.");
 		}
 		handShake = response;
+	}
+	
+	public boolean getHandShake(){
+		return handShake;
 	}
 
 	
@@ -161,8 +170,6 @@ public class SerialCommunication implements SerialPortEventListener{
 		try{
 			input = serialPort.getInputStream();
 			output = serialPort.getOutputStream();
-			writeData('A');
-			
 			//TO DO:::: WRITE DATA (0,0);
 			successful = true;
 			return successful;
@@ -176,9 +183,12 @@ public class SerialCommunication implements SerialPortEventListener{
 	}
 	
 	public void serialEvent(SerialPortEvent evt) {
-		
 		if(evt.getEventType() == SerialPortEvent.DATA_AVAILABLE){
+			System.out.print("Incoming: ");
 			try {
+				if(writing){
+					writing = false;
+				}
 				
 				byte singleData = (byte)input.read();
 				
@@ -186,14 +196,20 @@ public class SerialCommunication implements SerialPortEventListener{
 				if(singleData != NEW_LINE_ASCII){
 					logText = new String(new byte[] {singleData});
 					System.out.println(logText);
-					if(!handShake && logText.equals("A")){
-						writeData('A');
-						this.setHandShake(true);
-					}
 				} else {
 					System.out.println("");
 				}
-
+				
+/*				if(logText.equals("A")){
+					writeData('A');
+				}
+*/				
+				if(!handShake && logText.equals("A")){
+					writeData('A');
+					writeData('A');
+					this.setHandShake(true);
+				}
+				
 			} catch (Exception e) {
 				logText = "Failed to read data. (" + e.toString() + ")";
 				System.out.println(logText);
@@ -219,7 +235,7 @@ public class SerialCommunication implements SerialPortEventListener{
 	//starts the event listener that knows wheneber data is available to be read
 	//pre style ="font-size: 11px;": an open serial port
 	//post: an event listener for the serial port that knows when data is recieved
-	public void initListener(){
+	public void initListener(){		
 		try{
 			serialPort.addEventListener(this);
 			serialPort.notifyOnDataAvailable(true);
@@ -231,6 +247,34 @@ public class SerialCommunication implements SerialPortEventListener{
 		}
 	}
 	
+	//disconnect the serial port
+	//pre style="font-size: 11px;": an open serial port
+	//post: closed serial port
+	public void disconnect(){
+		//close the serial port
+		try {
+			writeData('C');
+			
+			serialPort.removeEventListener();
+			serialPort.close();
+			input.close();
+			output.close();
+			setConnected(false);
+			//window.keybindingController.toggleControls();
+			
+			logText = "Disconnected.";
+			//window.txtLog.setForeground(Color.red);
+			//window.txtLog.append(logText + "n");
+			System.out.println(logText);
+		} catch (Exception e){
+			logText = "Failed to close" + serialPort.getName() + "(" + e.toString() + ")";
+
+			System.out.println(logText);
+//			window.txtLog.setForeground(Color.red);
+//			window.txtLog.append(logText + "n");
+		}
+	}
+
 	/*	public static void main(String[] args){
 		SerialCommunication test = new SerialCommunication();
 		
@@ -238,33 +282,6 @@ public class SerialCommunication implements SerialPortEventListener{
 	}
 	
 */	
-	/*
-	//disconnect the serial port
-	//pre style="font-size: 11px;": an open serial port
-	//post: closed serial port
-	public void disconnect(){
-		//close the serial port
-		try {
-			writeData(0,0);
-			
-			serialPort.removeEventListener();
-			serialPort.close();
-			input.close();
-			output.close();
-			setConnected(false);
-			window.keybindingController.toggleControls();
-			
-			logText = "Disconnected.";
-			window.txtLog.setForeground(Color.red);
-			window.txtLog.append(logText + "n");
-		} catch (Exception e){
-			logText = "Failed to close" + serialPort.getName() + "(" + e.toString() + ")";
-			
-			window.txtLog.setForeground(Color.red);
-			window.txtLog.append(logText + "n");
-		}
-	}
-	*/
 	/*
 	
 	public void writeData(int leftThrottle, int rightThrottle){
