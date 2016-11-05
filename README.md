@@ -4,7 +4,7 @@ Created By: Jacob Taylor Cassady
 
 Contributor(s): Denny Joy
 
-Microcontroller: Teensy
+Microcontroller: Teensy 3.6
 
 Language: Java and C
 
