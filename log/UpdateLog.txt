@@ -1,4 +1,9 @@
 Entry - 11/3/2016:
   I successfully executed a handshake between the C code on the arduino and the Java code on my computer.  Furthermore, I successfully 
 sent/received information from both Java and the arduino.  Also, I used this connection to call two different if statements requiring
-input from serial.  Please view VDS3_0/log/ReferenceImages/11.3.2016.png for reference.
+input from serial.  Please view VDS3_0/log/ReferenceImages/11.3.2016.png for reference.  Deadline for successful back and forth communication between Java program and Teensy 3.6 is 11/7/16.
+  - Jacob Taylor Cassady
+
+Entry - 11/5/2016:
+  Wrote additional serial write statements in order to ensure every message sent from Java is received by the Teensy 3.6.  Kenny Dang finished the wiring of the BNO055 and BMP180.  Plan for the rest of the day is to confirm a hello world between the Teensy and the two sensors.  Deadline for this bench mark is 11/10/16.
+  - Jacob Taylor Cassady
