@@ -222,9 +222,9 @@ public class SerialCommunication implements SerialPortEventListener{
 	}
 	
 	
-	//starts the event listener that knows wheneber data is available to be read
+	//starts the event listener that knows whenever data is available to be read
 	//pre style ="font-size: 11px;": an open serial port
-	//post: an event listener for the serial port that knows when data is recieved
+	//post: an event listener for the serial port that knows when data is received
 	public void initListener(){		
 		try{
 			serialPort.addEventListener(this);
