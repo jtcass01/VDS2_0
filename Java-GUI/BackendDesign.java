@@ -1,14 +1,9 @@
-import java.util.Vector;
-
-public class BackendDesign {
+public class BackendDesign extends SerialCommunication {
 	private SerialCommunication test;
-	private Vector serialPorts;
 
 	public BackendDesign(){
 		test = new SerialCommunication();
-		Vector serialPorts = new Vector();
-		
-		serialPorts = test.searchForPorts();
+		test.searchForPorts();
 		test.connect();		
 	}
 	
@@ -18,7 +13,12 @@ public class BackendDesign {
 	
 	public void wData(char newData){
 		test.writeData(newData);
-	}
+		test.writeData('T');
+		test.writeData('R');
+		test.writeData('A');
+		test.writeData('S');
+		test.writeData('H');
+		}
 	
 	public boolean isConnected(){
 		return test.getHandShake();
