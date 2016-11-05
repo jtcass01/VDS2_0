@@ -31,7 +31,6 @@ public class SerialCommunication implements SerialPortEventListener{
 	//on whether the program is connected to a serial port or not
 	private boolean bConnected = false;
 	private boolean handShake = false;
-	private boolean writing = false;
 	
 	//the timeout value for connecting with the port
 	final static int TIMEOUT = 2000;
@@ -77,7 +76,6 @@ public class SerialCommunication implements SerialPortEventListener{
 	public boolean getConnected(){
 		return bConnected;
 	}
-
 	
 	public void setHandShake(boolean response){
 		if(response == true){
@@ -185,11 +183,7 @@ public class SerialCommunication implements SerialPortEventListener{
 	public void serialEvent(SerialPortEvent evt) {
 		if(evt.getEventType() == SerialPortEvent.DATA_AVAILABLE){
 			System.out.print("Incoming: ");
-			try {
-				if(writing){
-					writing = false;
-				}
-				
+			try {				
 				byte singleData = (byte)input.read();
 				
 				
@@ -200,10 +194,6 @@ public class SerialCommunication implements SerialPortEventListener{
 					System.out.println("");
 				}
 				
-/*				if(logText.equals("A")){
-					writeData('A');
-				}
-*/				
 				if(!handShake && logText.equals("A")){
 					writeData('A');
 					writeData('A');
@@ -275,37 +265,8 @@ public class SerialCommunication implements SerialPortEventListener{
 		}
 	}
 
-	/*	public static void main(String[] args){
-		SerialCommunication test = new SerialCommunication();
-		
-		test.searchForPorts();
-	}
 	
-*/	
-	/*
-	
-	public void writeData(int leftThrottle, int rightThrottle){
-		try {
-			output.write(leftThrottle);
-			output.flush();
-			//this is a delimiter for the data
-			output.write(DASH_ASCII);
-			output.flush();
-			
-			output.write(rightThrottle);
-			output.flush();
-			//will be read as a byte so it is a space key
-			output.write(SPACE_ASCII);
-			output.flush();
-		} catch (Exception e){
-			logText = "Failed to write data. (" + e.toString() + ")";
-			
-			window.txtLog.setForeground(Color.red);
-			window.txtLog.append(logText + "n");
-		}
-	}
-	
-	private void btnConnectctionPerformed(java.awt.event.ActionEvent evt){
+	/*private void btnConnectctionPerformed(java.awt.event.ActionEvent evt){
 		communicator.connect();
 		
 		if(communicator.getConnected == true){
