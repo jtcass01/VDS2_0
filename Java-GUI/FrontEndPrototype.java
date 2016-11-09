@@ -42,6 +42,13 @@ public class FrontEndPrototype {
 				backend.wData('E');
 				break;
 			case 3:
+				System.out.println("Get a current altitude reading");
+				backend.wData('P');
+				break;
+			case 4:
+				System.out.println("Get a current acceleration reading");
+				backend.wData('S');
+			case 5:
 				backend.disconnect();
 				cont = false;
 				System.out.println("\nGoodbye : )");
@@ -62,7 +69,9 @@ public class FrontEndPrototype {
 		System.out.println("==========MENU==========");
 		System.out.println("1 ) write B");
 		System.out.println("2 ) write E");
-		System.out.println("3 ) disconnect");		
+		System.out.println("3 ) Get Latest Pressure Reading");
+		System.out.println("4 ) Get Latest Acceleration Reading");
+		System.out.println("5 ) disconnect");
 		System.out.print("Enter selction: ");
 	}
 }
