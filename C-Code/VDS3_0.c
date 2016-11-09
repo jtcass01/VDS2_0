@@ -211,7 +211,7 @@ void updateTimesAccel(void){
     accel[i] = accel[i-1];
     accelTimes[i] = accelTimes[i-1];
   }
-  //accel[0] = Reading from BNO055
+  //accel[0] = getAcceleration()
   accelTimes[0] = millis();
 } //END updateTimesAccel()
 
