@@ -46,6 +46,8 @@ public class SerialCommunication implements SerialPortEventListener{
 	//Additional variables for non GUI access
 	private Scanner scan = new Scanner(System.in);
 	private Vector serialPorts = null;
+	String lastResponse = "";
+	boolean firstResponse = false;
 	
 	//Search for all the serial ports.
 	//pre style="font-size: 11px": none
@@ -181,25 +183,36 @@ public class SerialCommunication implements SerialPortEventListener{
 	}
 	
 	public void serialEvent(SerialPortEvent evt) {
+		
 		if(evt.getEventType() == SerialPortEvent.DATA_AVAILABLE){
-			System.out.print("Incoming: ");
 			try {				
 				byte singleData = (byte)input.read();
 				
 				
 				if(singleData != NEW_LINE_ASCII){
 					logText = new String(new byte[] {singleData});
-					System.out.println(logText);
-				} else {
+//					System.out.println(logText);
+				}/* else {
 					System.out.println("");
-				}
+				}*/
 				
 				if(!handShake && logText.equals("A")){
-					writeData('A');
 					writeData('A');
 					this.setHandShake(true);
 				}
 				
+				if(!firstResponse){
+					firstResponse = true;
+					lastResponse = "";
+				} else {
+					if(logText.equals(";")){
+						System.out.print("Incoming: ");
+						System.out.println(lastResponse);
+						lastResponse = "";
+					} else if (handShake) {
+						lastResponse+=logText;
+					}
+				}				
 			} catch (Exception e) {
 				logText = "Failed to read data. (" + e.toString() + ")";
 				System.out.println(logText);
@@ -240,7 +253,7 @@ public class SerialCommunication implements SerialPortEventListener{
 	//disconnect the serial port
 	//pre style="font-size: 11px;": an open serial port
 	//post: closed serial port
-	public void disconnect(){
+	public void disconnect(){  //TODO:::: FIX THIS FUNCTION
 		//close the serial port
 		try {
 			writeData('C');
