@@ -11,7 +11,7 @@ public class FrontEndPrototype {
 		boolean validResponse = false;
 		
 		while(!backend.isConnected()){
-			System.out.println("YOLO");
+			System.out.println("Disconnected.");
 			try {
 				Thread.sleep(3000);
 			} catch (InterruptedException e) {
