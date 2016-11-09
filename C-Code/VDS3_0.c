@@ -5,17 +5,23 @@
 #include <math.h>
 
 /********************BEGIN GLOBAL VARIABLES********************/
-char response;                 //Holds the most char recent response from Serial
-long padAlt;                   //The sea level (SL) altitude of the launchpad. (mm)
-long y;                        //Most recent altitude (mm).
-float v;                       //Most recent velocity (m/s).
+/*General Variables*/
+float v;                            //Most recent velocity (m/s).
 
-const int altN = 10;           //Number of Data Points per alt array.
-const int accelN = 10;         //Number of Data Points per accel array.
-unsigned long altTimes[altN];     //The n most recent times (ms).
-long alts[altN];                  //The n most recent altitudesAGL (mm).
+/*BMP180 Variables*/
+long padAlt;                        //The sea level (SL) altitude of the launchpad. (mm)
+long y;                             //Most recent altitude (mm).
+const int altN = 10;                //Number of Data Points per alt array.
+unsigned long altTimes[altN];       //The n most recent times (ms).
+long alts[altN];                    //The n most recent altitudesAGL (mm).
+
+/*BNO055 Variables*/
+const int accelN = 10;              //Number of Data Points per accel array.
 unsigned long accelTimes[accelN];   //The n most recent times (ms).
 float accel[accelN];                //The n most recent acceleration values.
+
+/*GUI Variables*/
+char response;                      //Holds the most char recent response from Serial
 /*********************END GLOBAL VARIABLES*********************/
 
 
@@ -37,10 +43,11 @@ Adafruit_BNO055 bno = Adafruit_BNO055();
 /********************BEGIN FUNCTION PROTOTYPES********************/
 /*General Functions*/
 void newFlight(void);                 //Initiates files and variables for a new flight
-float calulateVelocity(void);         //Calculates velocity using alt from bmp180 and accel from BNO055
+float calculateVelocity(void);         //Calculates velocity using alt from bmp180 and accel from BNO055
 
 /*GUI Functions*/
-void handShake(void);
+void handShake(void);                 //Initiates pairing with Java program
+void returnResponse(char);            //Returns received response from Java program with message stating what was received.
 
 /*BMP180 Functions*/
 long getAltitude(void);               //Finds current altitude using bmp180 sensor
@@ -87,23 +94,19 @@ void setup(void) {
 void loop(void){
   if(Serial.available() >= 4){
     response = Serial.read();
-     
+
+    returnResponse(response);
+    
     switch(response){
     case 'B':
-      Serial.print("B RECIEVED");
-      Serial.flush();
       break;
     case 'E':
-      Serial.print("E RECIEVED");
-      Serial.flush();
       break;
     case 'P':
       Serial.print(getAltitude());   
       Serial.flush();
       break;
     case 'S':
-      Serial.print("S RECIEVED;");
-      Serial.flush();
       break;
     default:
       break;
@@ -118,10 +121,10 @@ void loop(void){
 /*General Functions*/
 void newFlight(void){
   padAlt = getPadAlt();
-}
+} //END newFlight()
 
 
-float calulateVelocity(void){
+float calculateVelocity(void){
   //VARIABLES NEEDED FOR CALULATION
   long sumBMPTimes = 0;
   long sumBMPTimes2 = 0;
@@ -147,7 +150,7 @@ float calulateVelocity(void){
   }
 
   return (leftSide + rightSide);
-}
+}// END calculateVelocity()
 
 
 /*GUI Functions*/
@@ -156,7 +159,14 @@ void handShake() {
     Serial.write('A');   // send a capital A
     delay(300);
   }
-}
+} //END handShake()
+
+
+void returnResponse(char response) {
+  Serial.print(response);
+  Serial.print(" RECEIVED;");
+  Serial.flush();
+} //END returnResponse()
 
 
 /*BMP180 Functions*/
@@ -182,7 +192,7 @@ long getPadAlt(void){  //USED TO CALCULATE PAD ALTITUDE
   returnVal += getAltitude();
   returnVal /= 5;
   return returnVal;
-}//END findPadAlt()
+}//END getPadAlt()
 
 
 void updateTimesAlts(void){
@@ -192,7 +202,7 @@ void updateTimesAlts(void){
   }
   alts[0] = getAltitude() - padAlt;
   altTimes[0] = millis();
-}
+} //END updateTimesAlts()
 
 
 /*BNO055 Functions*/
@@ -203,7 +213,7 @@ void updateTimesAccel(void){
   }
   //accel[0] = Reading from BNO055
   accelTimes[0] = millis();
-}
+} //END updateTimesAccel()
 
 
 //TO DO:::: getAcceleration()
