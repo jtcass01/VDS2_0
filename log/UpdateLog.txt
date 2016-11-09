@@ -10,3 +10,11 @@ Entry - 11/5/2016:
 finished the wiring of the BNO055 and BMP180.  Plan for the rest of the day is to confirm a hello world between the Teensy and the two 
 sensors.  Deadline for this bench mark is 11/10/16.
   - Jacob Taylor Cassady
+
+Entry - 11/8/2017:
+  After some issues with the wiring of the BMP180, I have completed a "helloWorld" run with the pressure and acceleration sensors.  My next
+goal is to work on I/O using an SD card and my Java program as an output.  Additionally, my goal is to start developing the main C program
+to collect and report flight data.  I have been asked to put my GUI on hold but have began developing a rudimentary prototype at home.  
+My next deadline is 11/19/2016 when I have the following items due: help lydia with Kalman filter testing, convert velocity algorithm into
+C (complete), download sensor libraries (done), and create a reliable data I/O system using SD card (write function complete).
+  - Jacob Taylor Cassady
