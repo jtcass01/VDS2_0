@@ -5,6 +5,7 @@
 #include <math.h>
 
 /********************BEGIN GLOBAL VARIABLES********************/
+#define TESTMODE (0)
 /*General Variables*/
 float v;                            //Most recent velocity (m/s).
 
@@ -21,7 +22,7 @@ unsigned long accelTimes[accelN];   //The n most recent times (ms).
 float accel[accelN];                //The n most recent acceleration values.
 
 /*GUI Variables*/
-char response;                      //Holds the most char recent response from Serial
+char response;                      //Holds the most recent char response from Serial
 /*********************END GLOBAL VARIABLES*********************/
 
 
@@ -42,21 +43,24 @@ Adafruit_BNO055 bno = Adafruit_BNO055();
 
 /********************BEGIN FUNCTION PROTOTYPES********************/
 /*General Functions*/
-void newFlight(void);                 //Initiates files and variables for a new flight
-float calculateVelocity(void);         //Calculates velocity using alt from bmp180 and accel from BNO055
+void newFlight(void);                 //Initiates files and variables for a new flight.
+void initializeArrays(void);          //Fills arrays with zeros at setup.
+void flightMode(void);                //Begins flightMode sequence.  Dependent on TESTMODE
+void getData(void);                   //Attempts to retrieve data from sensors.
+float calculateVelocity(void);        //Calculates velocity using alt from bmp180 and accel from BNO055.
 
 /*GUI Functions*/
-void handShake(void);                 //Initiates pairing with Java program
+void handShake(void);                 //Initiates pairing with Java program.
 void returnResponse(char);            //Returns received response from Java program with message stating what was received.
 
 /*BMP180 Functions*/
-long getAltitude(void);               //Finds current altitude using bmp180 sensor
-long getPadAlt(void);                 //Finds pad altitude using bmp180 sensor
-void updateTimesAlts(void);           //Updates time and altitude data from bmp180
+long getAltitude(void);               //Finds current altitude using bmp180 sensor.
+long getPadAlt(void);                 //Finds pad altitude using bmp180 sensor.
+void updateTimesAlts(void);           //Updates time and altitude data from bmp180.
 
 /*BNO055 Functions*/
-long getAcceleration(void);           //TODO----FINISH THIS FUNCTION
-void updateTimesAccel(void);          //Updates time and acceleration data from BNO055
+float getAcceleration(void);          //TODO----FINISH THIS FUNCTION
+void updateTimesAccel(void);          //Updates time and acceleration data from BNO055.
 /*********************END FUNCTION PROTOTYPES*********************/
 
 
@@ -70,6 +74,7 @@ void setup(void) {
 
   //Confirm connection with Java program
   handShake();  // send a byte to establish contact until receiver responds
+
 
   //Initialize BMP180
   if(!bmp.begin()){
@@ -96,11 +101,13 @@ void loop(void){
     response = Serial.read();
 
     returnResponse(response);
-    
     switch(response){
-    case 'B':
+    case 'F':
+      Serial.print("Entering flight mode...;");
+      flightMode();
       break;
     case 'E':
+      Serial.print("Case E;");
       break;
     case 'P':
       Serial.print(getAltitude());   
@@ -120,8 +127,48 @@ void loop(void){
 /********************BEGIN FUNCTION DEFINITIONS********************/
 /*General Functions*/
 void newFlight(void){
+  initializeArrays();
   padAlt = getPadAlt();
 } //END newFlight()
+
+
+void initializeArrays(void){
+  for(unsigned int i = 0; i < altN; i++){
+    alts[i] = 0;
+    altTimes[i] = 0;
+  }
+
+  for(unsigned int i = 0; i < accelN; i++){
+    accel[i] = 0;
+    accelTimes[i] = 0;
+  }
+} //END initializeArrays()
+
+
+void flightMode(void){
+  while(Serial.available()<=0) {
+    getData();
+    v = calculateVelocity();
+    //kalmanFilter(alts[0],accel[0],v);
+    //writeToFile(altTimes[0], alts[0])
+  }
+} //END flightMode(void)
+
+
+void getData(void){
+  #if TESTMODE
+    //testMode code
+//    getTimeAltAccel(); //TO DO: <----this function
+  #else
+    //FlightMode code
+    //if(bmp180Ready){
+      updateTimesAlts();
+    //} else {
+      //requestBMP180();
+    //}
+    updateTimesAccel();
+  #endif
+}
 
 
 float calculateVelocity(void){
@@ -156,16 +203,20 @@ float calculateVelocity(void){
 /*GUI Functions*/
 void handShake() {
   while (Serial.available() <= 0) {
-    Serial.write('A');   // send a capital A
+    Serial.write('~');   // send a capital A
     delay(300);
   }
 } //END handShake()
 
 
 void returnResponse(char response) {
-  Serial.print(response);
-  Serial.print(" RECEIVED;");
-  Serial.flush();
+  if(response == '~'){
+      ;
+  } else {
+    Serial.print(response);
+    Serial.print(" RECEIVED;");
+    Serial.flush();
+  }
 } //END returnResponse()
 
 
@@ -211,10 +262,13 @@ void updateTimesAccel(void){
     accel[i] = accel[i-1];
     accelTimes[i] = accelTimes[i-1];
   }
-  //accel[0] = getAcceleration()
+  //accel[0] = Reading from BNO055
   accelTimes[0] = millis();
 } //END updateTimesAccel()
 
-
+float getAcceleration(void){
+  float result = 0;
+  return result;
+}
 //TO DO:::: getAcceleration()
 /*********************END FUNCTION DEFINITIONS*********************/
