@@ -6,6 +6,7 @@
 
 /********************BEGIN GLOBAL VARIABLES********************/
 #define TESTMODE (0)
+
 /*General Variables*/
 float v;                            //Most recent velocity (m/s).
 
@@ -43,29 +44,37 @@ Adafruit_BNO055 bno = Adafruit_BNO055();
 
 /********************BEGIN FUNCTION PROTOTYPES********************/
 /*General Functions*/
-void newFlight(void);                 //Initiates files and variables for a new flight.
+void newFlight(void);                 //Initiates files and variables for a new flight
 void initializeArrays(void);          //Fills arrays with zeros at setup.
 void flightMode(void);                //Begins flightMode sequence.  Dependent on TESTMODE
 void getData(void);                   //Attempts to retrieve data from sensors.
-float calculateVelocity(void);        //Calculates velocity using alt from bmp180 and accel from BNO055.
+float calculateVelocity(void);         //Calculates velocity using alt from bmp180 and accel from BNO055
 
 /*GUI Functions*/
-void handShake(void);                 //Initiates pairing with Java program.
+void handShake(void);                 //Initiates pairing with Java program
 void returnResponse(char);            //Returns received response from Java program with message stating what was received.
 
 /*BMP180 Functions*/
-long getAltitude(void);               //Finds current altitude using bmp180 sensor.
-long getPadAlt(void);                 //Finds pad altitude using bmp180 sensor.
-void updateTimesAlts(void);           //Updates time and altitude data from bmp180.
+long getAltitude(void);               //Finds current altitude using bmp180 sensor
+long getPadAlt(void);                 //Finds pad altitude using bmp180 sensor
+void updateTimesAlts(void);           //Updates time and altitude data from bmp180
 
 /*BNO055 Functions*/
-float getAcceleration(void);          //TODO----FINISH THIS FUNCTION
-void updateTimesAccel(void);          //Updates time and acceleration data from BNO055.
+long getAcceleration(void);           //TODO----FINISH THIS FUNCTION
+void updateTimesAccel(void);          //Updates time and acceleration data from BNO055
 /*********************END FUNCTION PROTOTYPES*********************/
 
 
 
-/********************BEGIN SETUP FUNCTION********************/
+
+/* _____      _               
+  / ____|    | |              
+ | (___   ___| |_ _   _ _ __  
+  \___ \ / _ \ __| | | | '_ \ 
+  ____) |  __/ |_| |_| | |_) |
+ |_____/ \___|\__|\__,_| .__/ 
+                       | |    
+                       |_|*/
 void setup(void) {  
   response = '\0';
 
@@ -95,16 +104,23 @@ void setup(void) {
 
 
 
-/********************BEGIN LOOP FUNCTION********************/
+
+/*__  __       _         _                       
+ |  \/  |     (_)       | |                      
+ | \  / | __ _ _ _ __   | |     ___   ___  _ __  
+ | |\/| |/ _` | | '_ \  | |    / _ \ / _ \| '_ \ 
+ | |  | | (_| | | | | | | |___| (_) | (_) | |_) |
+ |_|  |_|\__,_|_|_| |_| |______\___/ \___/| .__/ 
+                                          | |    
+                                          |_| */
 void loop(void){
-  if(Serial.available() >= 4){
+  if(Serial.available() >= 4){ //why >= 4?
     response = Serial.read();
 
     returnResponse(response);
     switch(response){
-    case 'F':
-      Serial.print("Entering flight mode...;");
-      flightMode();
+    case 'B':
+      Serial.print("Case B;");
       break;
     case 'E':
       Serial.print("Case E;");
@@ -124,14 +140,33 @@ void loop(void){
 
 
 
+
 /********************BEGIN FUNCTION DEFINITIONS********************/
-/*General Functions*/
+/* _____                           _   ______                _   _                 
+  / ____|                         | | |  ____|              | | (_)                
+ | |  __  ___ _ __   ___ _ __ __ _| | | |__ _   _ _ __   ___| |_ _  ___  _ __  ___ 
+ | | |_ |/ _ \ '_ \ / _ \ '__/ _` | | |  __| | | | '_ \ / __| __| |/ _ \| '_ \/ __|
+ | |__| |  __/ | | |  __/ | | (_| | | | |  | |_| | | | | (__| |_| | (_) | | | \__ \
+  \_____|\___|_| |_|\___|_|  \__,_|_| |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/*/
+
+/**************************************************************************/
+/*!
+@brief  Prepares varaibles for new launch
+Author: Jake
+*/
+/**************************************************************************/
 void newFlight(void){
   initializeArrays();
   padAlt = getPadAlt();
 } //END newFlight()
 
 
+/**************************************************************************/
+/*!
+@brief  Initializes arrays to have values of 0 for a new flight.
+Author: Jake
+*/
+/**************************************************************************/
 void initializeArrays(void){
   for(unsigned int i = 0; i < altN; i++){
     alts[i] = 0;
@@ -145,6 +180,12 @@ void initializeArrays(void){
 } //END initializeArrays()
 
 
+/**************************************************************************/
+/*!
+@brief  Launch and test sequence.
+Author: Jake
+*/
+/**************************************************************************/
 void flightMode(void){
   while(Serial.available()<=0) {
     getData();
@@ -155,6 +196,12 @@ void flightMode(void){
 } //END flightMode(void)
 
 
+/**************************************************************************/
+/*!
+@brief  Gathers data from the desired source (Sensors or file).  Dependent on TESTMODE
+Author: Jake
+*/
+/**************************************************************************/
 void getData(void){
   #if TESTMODE
     //testMode code
@@ -171,6 +218,13 @@ void getData(void){
 }
 
 
+/**************************************************************************/
+/*!
+@brief  Calculates a velocity value using altitude data from BMP180 and acceleration data fromm BNO055.
+Author: Jake & Ben
+  - Algorithm developed by Ben Stringer, function written by Jacob Cassady
+*/
+/**************************************************************************/
 float calculateVelocity(void){
   //VARIABLES NEEDED FOR CALULATION
   long sumBMPTimes = 0;
@@ -200,7 +254,20 @@ float calculateVelocity(void){
 }// END calculateVelocity()
 
 
-/*GUI Functions*/
+/*/$$$$$$  /$$   /$$ /$$$$$$       /$$$$$$$$                              /$$     /$$                              
+ /$$__  $$| $$  | $$|_  $$_/      | $$_____/                             | $$    |__/                              
+| $$  \__/| $$  | $$  | $$        | $$    /$$   /$$ /$$$$$$$   /$$$$$$$ /$$$$$$   /$$  /$$$$$$  /$$$$$$$   /$$$$$$$
+| $$ /$$$$| $$  | $$  | $$        | $$$$$| $$  | $$| $$__  $$ /$$_____/|_  $$_/  | $$ /$$__  $$| $$__  $$ /$$_____/
+| $$|_  $$| $$  | $$  | $$        | $$__/| $$  | $$| $$  \ $$| $$        | $$    | $$| $$  \ $$| $$  \ $$|  $$$$$$ 
+| $$  \ $$| $$  | $$  | $$        | $$   | $$  | $$| $$  | $$| $$        | $$ /$$| $$| $$  | $$| $$  | $$ \____  $$
+|  $$$$$$/|  $$$$$$/ /$$$$$$      | $$   |  $$$$$$/| $$  | $$|  $$$$$$$  |  $$$$/| $$|  $$$$$$/| $$  | $$ /$$$$$$$/
+ \______/  \______/ |______/      |__/    \______/ |__/  |__/ \_______/   \___/  |__/ \______/ |__/  |__/|_______/ */
+/**************************************************************************/
+/*!
+@brief  Initializes and confirms connection with Java program.
+Author: Jake
+*/
+/**************************************************************************/
 void handShake() {
   while (Serial.available() <= 0) {
     Serial.write('~');   // send a capital A
@@ -208,7 +275,12 @@ void handShake() {
   }
 } //END handShake()
 
-
+/**************************************************************************/
+/*!
+@brief  Returns a received response from the Java program to ensure successful delivery
+Author: Jake
+*/
+/**************************************************************************/
 void returnResponse(char response) {
   if(response == '~'){
       ;
@@ -220,7 +292,23 @@ void returnResponse(char response) {
 } //END returnResponse()
 
 
-/*BMP180 Functions*/
+/*____                 __  ___   ___    ______                _   _                 
+ |  _ \               /_ |/ _ \ / _ \  |  ____|              | | (_)                
+ | |_) |_ __ ___  _ __ | | (_) | | | | | |__ _   _ _ __   ___| |_ _  ___  _ __  ___ 
+ |  _ <| '_ ` _ \| '_ \| |> _ <| | | | |  __| | | | '_ \ / __| __| |/ _ \| '_ \/ __|
+ | |_) | | | | | | |_) | | (_) | |_| | | |  | |_| | | | | (__| |_| | (_) | | | \__ \
+ |____/|_| |_| |_| .__/|_|\___/ \___/  |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/
+                 | |                                                                
+                 |_|                                                                
+*/
+/**************************************************************************/
+/*!
+@brief  calculates current altitude.
+Will become legacy soon (11/10/16) as this function is slow. Will be replaced 
+with a faster function
+Author: Ben
+*/
+/**************************************************************************/
 long getAltitude(void){  //USED TO CALCULATE CURRENT ALTITUDE
   bmp.getEvent(&event);
   if (event.pressure){
@@ -230,7 +318,12 @@ long getAltitude(void){  //USED TO CALCULATE CURRENT ALTITUDE
   }
 }//END getAltitude()
 
-
+/**************************************************************************/
+/*!
+@brief  calculates the ASL altitude of the launch pad
+Author: Ben
+*/
+/**************************************************************************/
 long getPadAlt(void){  //USED TO CALCULATE PAD ALTITUDE
   long returnVal = getAltitude();
   delay(500);
@@ -245,7 +338,12 @@ long getPadAlt(void){  //USED TO CALCULATE PAD ALTITUDE
   return returnVal;
 }//END getPadAlt()
 
-
+/**************************************************************************/
+/*!
+@brief  updates the array of altitude readings and the corresponding time readings
+Author: Ben
+*/
+/**************************************************************************/
 void updateTimesAlts(void){
   for (unsigned i = altN-1; i>0; i--){
     alts[i] = alts[i-1];
@@ -256,7 +354,18 @@ void updateTimesAlts(void){
 } //END updateTimesAlts()
 
 
-/*BNO055 Functions*/
+/*____               ___  _____ _____   ______                _   _                 
+ |  _ \             / _ \| ____| ____| |  ____|              | | (_)                
+ | |_) |_ __   ___ | | | | |__ | |__   | |__ _   _ _ __   ___| |_ _  ___  _ __  ___ 
+ |  _ <| '_ \ / _ \| | | |___ \|___ \  |  __| | | | '_ \ / __| __| |/ _ \| '_ \/ __|
+ | |_) | | | | (_) | |_| |___) |___) | | |  | |_| | | | | (__| |_| | (_) | | | \__ \
+ |____/|_| |_|\___/ \___/|____/|____/  |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/*/
+/**************************************************************************/
+/*!
+@brief  updates the array of acceleration readings and the corresponding time readings
+Author: Jake
+*/
+/**************************************************************************/
 void updateTimesAccel(void){
   for (unsigned i = accelN; i>0; i--){
     accel[i] = accel[i-1];
@@ -267,8 +376,7 @@ void updateTimesAccel(void){
 } //END updateTimesAccel()
 
 float getAcceleration(void){
-  float result = 0;
-  return result;
+  
 }
 //TO DO:::: getAcceleration()
 /*********************END FUNCTION DEFINITIONS*********************/
