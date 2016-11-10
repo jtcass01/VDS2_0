@@ -21,21 +21,22 @@ complete).
   - Jacob Taylor Cassady
 
 Entry 1 - 11/9/2016:
-  Updated Java Serial Listener to receive strings ending in ';'.  This allows the responses to come across as sentences of any length and 
-output all words, characters, and punctuation at the same time.  ';' was chosen as the message tail at random and can easily be changed to
-more rare characters such as '|'.  Also, I have replaced 'A' in the handShake with '~' and also replaced the trash bytes with '~' as well
-to increase reliability of message delivery without limiting the program of likely chars such as 'A'.
+  Updated Java Serial Listener to receive strings ending in ';'.  This allows the responses to come across as sentences of any length 
+and output all words, characters, and punctuation at the same time.  ';' was chosen as the message tail at random and can easily be 
+changed to more rare characters such as '|'.  Also, I have replaced 'A' in the handShake with '~' and also replaced the trash bytes with 
+'~' as well to increase reliability of message delivery without limiting the program of likely chars such as 'A'.
   - Jacob Taylor Cassady
 
 Entry 2 - 11/9/2016:
-  Finished basic struture of program.  See VDS3_0 in the C code's file.  I still need to write the getAcceleration function using the same
-structure and math from VDS2_0.  Also, I am waiting on Ben Stringer (team lead and co-captian) to develop a request method for our BMP180 
-sensor. Furthermore, I am excited for Denny Joy to finish the List.c (single linked list) program and translate it into a header file to 
-greatly increase the effeciency of the program.
+  Finished basic struture of program.  See VDS3_0 in the C code's file.  I still need to write the getAcceleration function using the 
+same structure and math from VDS2_0.  Also, I am waiting on Ben Stringer (team lead and co-captian) to develop a request method for our 
+BMP180 sensor. Furthermore, I am excited for Denny Joy to finish the List.c (single linked list) program and translate it into a header 
+file to greatly increase the effeciency of the program.
   - Jacob Taylor Cassady
 
 Entry 1 - 11/10/2016:
   Ben Stringer added awesome headings to each section of our main program VDS3_0.c.  I began work on a new program called IOTest.c today
 to test and stress functions which will retrieve and display data received from different tests and launches and write data to an SD 
-card.  Also, I continued to polish and make additions to VDS3_0.c.  I was unable to determine the chipselect pin on the teensy and will have to consult with Kenny Dang, an Electrical Engineer, this afternoon before I can continue on IO.
+card.  Also, I continued to polish and make additions to VDS3_0.c.  I was unable to determine the chipselect pin on the teensy and will 
+have to consult with Kenny Dang, an Electrical Engineer, this afternoon before I can continue on IO.
   - Jacob Taylor Cassady
