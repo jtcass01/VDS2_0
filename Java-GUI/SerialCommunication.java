@@ -43,11 +43,11 @@ public class SerialCommunication implements SerialPortEventListener{
 	//a string for recording what goes on in the program
 	String logText = "";
 	
-	//Additional variables for non GUI access
+	//Additional variables created by me
 	private Scanner scan = new Scanner(System.in);
 	private Vector serialPorts = null;
 	String lastResponse = "";
-	boolean firstResponse = false;
+	boolean firstResponse = true;
 	
 	//Search for all the serial ports.
 	//pre style="font-size: 11px": none
@@ -182,6 +182,10 @@ public class SerialCommunication implements SerialPortEventListener{
 		
 	}
 	
+	
+	//starts the event listener that knows whenever data is available to be read
+	//pre style ="font-size: 11px;": an open serial port
+	//post: an event listener for the serial port that knows when data is received
 	public void serialEvent(SerialPortEvent evt) {
 		
 		if(evt.getEventType() == SerialPortEvent.DATA_AVAILABLE){
@@ -191,18 +195,15 @@ public class SerialCommunication implements SerialPortEventListener{
 				
 				if(singleData != NEW_LINE_ASCII){
 					logText = new String(new byte[] {singleData});
-//					System.out.println(logText);
-				}/* else {
-					System.out.println("");
-				}*/
+				}
 				
-				if(!handShake && logText.equals("A")){
-					writeData('A');
+				if(!handShake && logText.equals("~")){
+					writeData('~');
 					this.setHandShake(true);
 				}
 				
-				if(!firstResponse){
-					firstResponse = true;
+				if(logText.equals("~")){
+					;
 					lastResponse = "";
 				} else {
 					if(logText.equals(";")){
@@ -212,7 +213,7 @@ public class SerialCommunication implements SerialPortEventListener{
 					} else if (handShake) {
 						lastResponse+=logText;
 					}
-				}				
+				}
 			} catch (Exception e) {
 				logText = "Failed to read data. (" + e.toString() + ")";
 				System.out.println(logText);
@@ -235,9 +236,6 @@ public class SerialCommunication implements SerialPortEventListener{
 	}
 	
 	
-	//starts the event listener that knows whenever data is available to be read
-	//pre style ="font-size: 11px;": an open serial port
-	//post: an event listener for the serial port that knows when data is received
 	public void initListener(){		
 		try{
 			serialPort.addEventListener(this);
@@ -253,7 +251,7 @@ public class SerialCommunication implements SerialPortEventListener{
 	//disconnect the serial port
 	//pre style="font-size: 11px;": an open serial port
 	//post: closed serial port
-	public void disconnect(){  //TODO:::: FIX THIS FUNCTION
+	public void disconnect(){
 		//close the serial port
 		try {
 			writeData('C');
