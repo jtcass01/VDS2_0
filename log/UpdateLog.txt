@@ -24,3 +24,10 @@ Entry - 11/9/2016:
 output all words, characters, and punctuation at the same time.  ";" was chosen as the message tail at random and can easily be changed to
 more rare characters such as "~" or "|".
   - Jacob Taylor Cassady
+
+Entry - 11/9/2016:
+  Finished basic struture of program.  See VDS3_0 in the C code's file.  I still need to write the getAcceleration function using the same
+structure and math from VDS2_0.  Also, I am waiting on Ben Stringer (team lead and co-captian) to develop a request method for our BMP180 
+sensor. Furthermore, I am excited for Denny Joy to finish the List.c (single linked list) program and translate it into a header file to 
+greatly increase the effeciency of the program.
+  - Jacob Taylor Cassady
