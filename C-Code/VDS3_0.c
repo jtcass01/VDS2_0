@@ -60,7 +60,7 @@ long getPadAlt(void);                 //Finds pad altitude using bmp180 sensor
 void updateTimesAlts(void);           //Updates time and altitude data from bmp180
 
 /*BNO055 Functions*/
-long getAcceleration(void);           //TODO----FINISH THIS FUNCTION
+float getAcceleration(void);           //TODO----FINISH THIS FUNCTION
 void updateTimesAccel(void);          //Updates time and acceleration data from BNO055
 /*********************END FUNCTION PROTOTYPES*********************/
 
@@ -83,7 +83,6 @@ void setup(void) {
 
   //Confirm connection with Java program
   handShake();  // send a byte to establish contact until receiver responds
-
 
   //Initialize BMP180
   if(!bmp.begin()){
@@ -254,6 +253,8 @@ float calculateVelocity(void){
 }// END calculateVelocity()
 
 
+
+
 /*/$$$$$$  /$$   /$$ /$$$$$$       /$$$$$$$$                              /$$     /$$                              
  /$$__  $$| $$  | $$|_  $$_/      | $$_____/                             | $$    |__/                              
 | $$  \__/| $$  | $$  | $$        | $$    /$$   /$$ /$$$$$$$   /$$$$$$$ /$$$$$$   /$$  /$$$$$$  /$$$$$$$   /$$$$$$$
@@ -290,6 +291,8 @@ void returnResponse(char response) {
     Serial.flush();
   }
 } //END returnResponse()
+
+
 
 
 /*____                 __  ___   ___    ______                _   _                 
@@ -352,6 +355,8 @@ void updateTimesAlts(void){
   alts[0] = getAltitude() - padAlt;
   altTimes[0] = millis();
 } //END updateTimesAlts()
+
+
 
 
 /*____               ___  _____ _____   ______                _   _                 
