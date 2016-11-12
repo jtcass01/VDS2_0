@@ -40,3 +40,11 @@ to test and stress functions which will retrieve and display data received from 
 card.  Also, I continued to polish and make additions to VDS3_0.c.  I was unable to determine the chipselect pin on the teensy and will 
 have to consult with Kenny Dang, an Electrical Engineer, this afternoon before I can continue on IO.
   - Jacob Taylor Cassady
+
+Entry 1 - 11/12/2016:
+  Successfully read from and wrote to built in SD card on Teensy 3.6.  This took several days to successfully accomplish as I began by
+spending a lot of time attempting the reach the micro SD card through a chip select and MISO/MOSI. I have now found that the best way
+to contact the SD card is through a library called SdFat.  Furthermore, it is important to note the SdFat class does not work with the
+Teensy 3.6.  The only class I could get to work was SdFatStio.  The next step for me to work on is reading known past flight data from
+an SD card in order to simulate the Kalman Filter and other program functions.
+  - Jacob Taylor Cassady
