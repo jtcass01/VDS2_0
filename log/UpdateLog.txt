@@ -58,3 +58,12 @@ through a library called SdFat.  Furthermore, it is important to note the SdFat 
 I could get to work was SdFatStio.  The next step for me to work on is reading past flight data from an SD card into our flight mode 
 loop in order to simulate the Kalman Filter and other program functions.
   - Jacob Taylor Cassady
+
+Entry 1 - 11/14/2016:
+  Completed File IO functions which draw test data from a CVS file.  Also updated writeToFile() function as well as updated VDS3_0.c 
+with the tested functions from IOTest.c.  Ben said he will get me usable data for a test run by the weekend.  This test will allow us to
+test our Velocity function and kalman filter. Denny noted that he will not have the Binary Tree header done in time as he has been busy
+with the team website.  Next goal is to continue to shape VDS3_0.c and to write the getAcceleration function.  Also it might be a good 
+idea to rewrite the functions which update acceleration, altitude, and time values to accept parameters instead of using global 
+variables.
+  - Jacob Taylor Cassady
