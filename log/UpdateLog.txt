@@ -48,7 +48,7 @@ efficient binary tree possible.  The algorithm, uses the difference between the 
 right child and the difference between 0 and current or middle and current if looking for the left child.  Then, you divide that
 difference in half and take the floor/ceiling of the given value depending on which side of the node you are on.  For instance, when
 finding the right child of node 7 with a capacity of 14, you'd take half of 14-7 = 7.  Then divide 7/2=3.5  and find the ceiling of 3.5
-which equals 4.  Therefore the right node of 7 should be 11.  Deeny Joy is using my binary search tree program written in cpp to develop
+which equals 4.  Therefore the right node of 7 should be 11.  Denny Joy is using my binary search tree program written in cpp to develop
 a c header file to use in our program in place of the altitude, acceleration, and time arrays.
   - Jacob Taylor Cassady
 
