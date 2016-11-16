@@ -1,4 +1,4 @@
-# VDS3_0 - River City Rocketry
+# VDS2_0 - River City Rocketry
 
 Created By: Jacob Taylor Cassady
 
