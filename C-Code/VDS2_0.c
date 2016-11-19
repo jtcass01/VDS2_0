@@ -6,6 +6,8 @@
 #include "hashTagDefines.h" //All the VDS settings and constants are here
 #include "RCR_Bmp180.h"     //Our own version of the pressure sensor library
 #include "MatrixMath.h"
+#include <SdFat.h>
+#include <SPI.h>
 
 struct stateStruct {
 	float alt;
@@ -74,7 +76,7 @@ void newFlight(void);                               //Initiates files and variab
 void initializeArrays(void);                        //Fills arrays with zeros at setup.
 void flightMode(void);                              //Begins flightMode sequence.  Dependent on TESTMODE
 struct stateStruct getRawState(void);               //Retrieves data from sensors.
-float calculateVelocity(struct stateStruct*);       //Calculates velocity using alt from bmp180 and accel from BNO055
+void calculateVelocity(struct stateStruct*);       //Calculates velocity using alt from bmp180 and accel from BNO055
 
 /*GUI Functions*/
 void handShake(void);                               //Initiates pairing with Java program
@@ -87,7 +89,9 @@ long getAltitude(void);                             //Finds current altitude usi
 long getPadAlt(void);                               //Finds pad altitude using bmp180 sensor
 
 /*BNO055 Functions*/
-float getAcceleration(void);                        //TODO----FINISH THIS FUNCTION
+float getAcceleration(void);                        //Returns the vertical acceleration as a floating point value
+void calibrateBNO(void);                            //Enters program into a calibration mode, requiring the BNO's acceleration calibration
+                                                    //value to reach 3 before exiting.
 
 /*Kalman Functions*/
 struct stateStruct kalman(int16_t, struct stateStruct);    //Filters the state of the vehicle
@@ -132,16 +136,22 @@ void setup(void) {
 
 	// start serial port at //115200 bps:
 	Serial.begin(38400);
+	delay(10);
+	Serial.println("Serial has begun:");
 
 	//Confirm connection with Java program
 	//handShake();  // send a byte to establish contact until receiver responds
 
 	//Initialize BMP180
+	delay(10);
+	digitalWrite(LED, HIGH); //turn on on-board LED
+
 	if (!bmp.begin()) {
 		Serial.println("NO Bmp180 DETECTED!");
 	}
 	else {
 		bmp180_init = true;
+		Serial.println("Bmp180 :)");
 	}
 
 	//Initialize BNO055
@@ -151,15 +161,16 @@ void setup(void) {
 	else {
 		bno055_init = true;
 		bno.setExtCrystalUse(true);
+		Serial.println("Bno055 :)");
 	}
 
-  //Initialize SD card
+//  Initialize SD card
   if(!sd.begin()){
     Serial.println("SD card initialization failed!");
   }
   	
 	newFlight();
-	digitalWrite(LED, HIGH); //turn on on-board LED
+
 
 	//State what debug levels are activated
 #if DEBUG_NORMAL
@@ -198,6 +209,7 @@ void loop(void) {
 		switch (Serial.read()) {
 		case 'B':
 			Serial.println("Case B;");
+      calibrateBNO();
 			eatYourBreakfast();
 			break;
 		case 'e':
@@ -223,6 +235,7 @@ void loop(void) {
 			}
 			else {
 				Serial.println("Entering Flight Mode");
+				delay(2000);
 				flightMode();
 			}
 			break;
@@ -275,8 +288,9 @@ void flightMode(void) {
 		}
 
 		rawState = getRawState();
+		printState(rawState, "raw State");
 		filteredState = kalman(encPos, rawState);
-		writeToFile(rawState, filteredState)
+		writeToFile(rawState, filteredState);
 	}
 	//if some serial input ~= to the standdown code or 1 second passes, call flightmode again...  need to discuss
 } //END flightMode(void)
@@ -297,16 +311,19 @@ rawState = readFromFile();
 #else
 
 //get raw altitude
-	altitude_plz(&rawState.alt);
+	//altitude_plz(&rawState.alt);
+	altitude_plz(&rawState);
+	printState(rawState, "rawState_1");
 	rawState.alt -= padAlt;
 
 	//get time
 	rawState.time = millis();
+	printState(rawState, "rawState_2");
 
 	//get raw acceleration
-	//rawState.rawAccel = acceleration_plz;
+	rawState.accel = getAcceleration();;
 
-	printState(rawState, "raw state");
+	//printState(rawState, "raw state");
 
 #endif
 
@@ -453,6 +470,7 @@ void printState(struct stateStruct state, String label) {
 	Serial.println(state.alt);
 	Serial.println(state.vel);
 	Serial.println(state.accel);
+	Serial.println(state.time);
 }
 
 /**************************************************************************/
@@ -630,7 +648,8 @@ Pronounced "altitude please".
 Author: Ben
 */
 /**************************************************************************/
-bool altitude_plz(float *altitude) {
+//bool altitude_plz(float *altitude) {
+bool altitude_plz(struct stateStruct *rawState) {
 	float pressure_kPa;
 	float pressure_; //units are Pa*10?
 
@@ -643,30 +662,23 @@ bool altitude_plz(float *altitude) {
 		Serial.println(millis());
 #endif
 		pressure_ = pressure_kPa / 100.0F;
-		*altitude = (bmp.pressureToAltitude(SENSORS_PRESSURE_SEALEVELHPA, pressure_));
+		//*altitude = (bmp.pressureToAltitude(SENSORS_PRESSURE_SEALEVELHPA, pressure_));
+		rawState->alt = (bmp.pressureToAltitude(SENSORS_PRESSURE_SEALEVELHPA, pressure_));
+
+#if DEBUG_ALPHA
+		Serial.print("RCR_getPressure returned: ");
+		Serial.print(pressure_kPa);
+		Serial.print("  kPa at t = ");
+		Serial.println(millis());
+		Serial.print("  altitude = ");
+		Serial.println(rawState->alt);
+#endif
 		return true;
 	}
 	else {
 		return false;
 	}
 }
-
-
-/**************************************************************************/
-/*!
-@brief  updates the array of altitude readings and the corresponding time readings
-Author: Ben
-*/
-/**************************************************************************/
-//void updateTimesAlts(void){
-//  for (unsigned i = ALT_N-1; i>0; i--){
-//    alts[i] = alts[i-1];
-//    altTimes[i] = altTimes[i-1];
-//  }
-//  alts[0] = getAltitude() - padAlt;
-//  altTimes[0] = millis();
-//} //END updateTimesAlts()
-
 
 
 
@@ -678,16 +690,78 @@ Author: Ben
 |____/|_| |_|\___/ \___/|____/|____/  |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/*/
 /**************************************************************************/
 /*!
-@brief  updates the array of acceleration readings and the corresponding time readings
+@brief  Returns the vertical acceleration as a floating point value
 Author: Jake
 */
 /**************************************************************************/
 float getAcceleration(void) {
+  imu::Vector<3> gravity = bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
+  imu::Vector<3> linear = bno.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
+  float linearDotGravity = 0, theta = 0, defOfProduct = 0, magOfVerticalAcceleration = 0, verticalAcceleration = 0, magL = 0, magG = 0;
+  float xG=0, yG=0, zG=0, xL=0, yL=0, zL=0;
 
-	return 0;
+  xG = (float)gravity.x();
+  yG = (float)gravity.y();
+  zG = (float)gravity.z();
+
+  xL = (float)linear.x();
+  yL = (float)linear.y();
+  zL = (float)linear.z();
+  
+  linearDotGravity = (xG*xL)+(yG*yL)+(zG*zL);
+
+  magL = pow(((xL*xL)+(yL*yL)+(zL*zL)),0.5);
+  magG = pow(((xG*xG)+(yG*yG)+(zG*zG)),.5);
+
+  defOfProduct = linearDotGravity / (magL*magG);
+
+  theta = acos(defOfProduct);
+  theta = (theta*180)/PI;
+
+  magOfVerticalAcceleration = linearDotGravity / magG;
+
+  if(90 < theta || theta < 270){
+    verticalAcceleration = magOfVerticalAcceleration;
+  } else {
+    verticalAcceleration = magOfVerticalAcceleration * -1;
+  }
+
+  return verticalAcceleration;
+}//END getAcceleration();
+
+
+/**************************************************************************/
+/*!
+@brief  Enters program into a calibration mode, requiring the BNO's acceleration calibration
+        value to reach 3 before exiting.
+Author: Jake
+*/
+/**************************************************************************/
+void calibrateBNO(void) {
+  uint8_t system, gyro, accel, mag = 0;
+  int calibrationCount = 0;
+  
+  Serial.println("Calibrating BNO055...;");
+
+  while(calibrationCount < 5){
+    bno.getCalibration(&system, &gyro, &accel, &mag);
+    Serial.print("CALIBRATION: Sys=");
+    Serial.print(system, DEC);
+    Serial.print(" Gyro=");
+    Serial.print(gyro, DEC);
+    Serial.print(" Accel=");
+    Serial.print(accel, DEC);
+    Serial.print(" Mag=");
+    Serial.print(mag, DEC);
+    Serial.println(";");
+
+    if(accel > 2){
+      calibrationCount += 1;
+    } else {
+      calibrationCount = 0;
+    }
+  }
 }
-//TO DO:::: getAcceleration()
-/*********************END FUNCTION DEFINITIONS*********************/
 
 
 /*           ,,    ,,                                                                                     ,,                             
@@ -745,7 +819,7 @@ struct stateStruct readFromFile(void){
   int lineCount = 0;
   static int linePlaceHolder = 0;
 
-  struct stateStruct = fileData;
+  struct stateStruct fileData;
 
   if(myFile){
     while(myFile.available()) {
