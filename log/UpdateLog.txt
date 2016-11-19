@@ -79,4 +79,5 @@ My next step is to work on the getAcceleration function.
 
 Entry 1 - 11/18/2016:
   Created a new unit test for vertical acceleration values.  The proof and explanation of the math being done in the getAcceleration()
-function can be seen in the referenceImages
+function can be seen in the ReferenceImages folder and is titled AccelerationProof.jpg.  Furthermore, I completed the calibrateBNO() 
+function.  These two functions were tested before hand.  This test can be seen in the Tests folder and is titled BNOTest.c.
