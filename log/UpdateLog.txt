@@ -78,4 +78,5 @@ My next step is to work on the getAcceleration function.
   - Jacob Taylor Cassady
 
 Entry 1 - 11/18/2016:
-  Created a new unit test for vertical acceleration values.  
+  Created a new unit test for vertical acceleration values.  The proof and explanation of the math being done in the getAcceleration()
+function can be seen in the referenceImages
