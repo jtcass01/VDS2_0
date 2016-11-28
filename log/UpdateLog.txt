@@ -95,3 +95,11 @@ as well as errors in the equation itself, we came close to receiving expected va
 weekend, Ben Stringer confirmed the left side of the equation.  There still are some issues with specific value cases as noted 
 in the VelocityEquation.jpg image included in the ReferenceImages file.
   - Jacob Taylor Cassady
+
+Entry 1 - 11/27/2016:
+  Rewrote writeToFile functions to  include additional information.  Reworked math associated with velocity and acceleration functions 
+with Ben Stringer and Denny Joy.  We are confident we will be prepared for our first subscale test flight this Saturday on 12/3/16 
+where we will test our functional methods which retrieve data from sensors and other nonfunctional methods formulate new data from
+previously retrieved data points.  The important methods to test are: calculateVelocity(), getAcceleration(), and kalman() functions.
+These are the most heavily math intensive equations and are new to the VDS since prior test launches over the summer.
+  - Jacob Tyalor Cassady
