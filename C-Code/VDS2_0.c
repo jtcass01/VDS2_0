@@ -3,8 +3,8 @@
 #include <Wire.h>
 #include <math.h>
 
-#include "hashTagDefines.h" //All the VDS settings and constants are here
-#include "RCR_Bmp180.h"     //Our own version of the pressure sensor library
+#include "hashTagDefines.h"		//All the VDS settings and constants are here
+#include "RCR_Bmp180.h"			//Our own version of the pressure sensor library
 #include "MatrixMath.h"
 #include <SdFat.h>
 #include <SPI.h>
@@ -14,21 +14,24 @@ struct stateStruct {
 	float vel;
 	float accel;
 	float time;
+	float buff_t;				//The time relative to the present moment. (used in calculateVelocity())
 };
 
 /********************BEGIN GLOBAL VARIABLES********************/
 /*General Variables*/
 struct stateStruct pastRawStates[BUFF_N];
+unsigned long timer = 0;
+unsigned int stopWatch = 0;
 
 /*BMP180 Variables*/
-long padAlt;                        //The sea level (SL) altitude of the launchpad. (mm)
-bool bmp180_init = false;			      //used to inform user that the bmp180 was not initialized succesfully
+long padAlt;								//The sea level (SL) altitude of the launchpad. (mm)
+bool bmp180_init = false;					//used to inform user that the bmp180 was not initialized succesfully
 
 /*BNO055 Variables*/
-bool bno055_init = false;			      //used to inform user that the bno055 was not initialized succesfully
+bool bno055_init = false;					//used to inform user that the bno055 was not initialized succesfully
 
 /*GUI Variables*/
-char response;                      //Holds the most recent char response from Serial
+char response;								//Holds the most recent char response from Serial
 
 /*Kalman variables*/
 float q_k[3][3] = {
@@ -47,11 +50,7 @@ volatile uint8_t encPos = 0;
 
 /*********************END GLOBAL VARIABLES*********************/
 
-//temporary!!
-//float *state;// = (float*)malloc(12); //how do I allocate 3*32 bits of space for this variable?
-//float z_k_1[3] = { 0.3974, 6.7814, 102.8645 };
-//float z_k_2[3] = { 4.7064,31.5675, 110.7171 };
-//float z_k_3[3] = { 15.9803,61.2562, 138.1404 };
+//tests for the kalman filter...
 struct stateStruct filteredState_test;
 struct stateStruct z_k_1;
 struct stateStruct z_k_2;
@@ -100,7 +99,8 @@ void calibrateBNO(void);                            //Enters program into a cali
 void kalman(int16_t, struct stateStruct, struct stateStruct*);    //Filters the state of the vehicle
 
 /*File IO Functions*/
-void writeToFile(struct stateStruct, struct stateStruct);  //Writes data to file
+void storeInfo(float);                              //Stores one data point, followed by a comma, to VDSv2FlightData.dat
+void storeStructs(struct stateStruct, struct stateStruct); //Stores all information from both structs to VDSv2FlightData.dat and ends the line.
 void readFromFile(struct stateStruct* destination);        //Retrieves past flight data for tests.  Replaces sensor functions
 void resetNumber(char*);                            //Resets (char)number array to NULL values.
 float charToFloat(char);                            //Converts a char number to a floating point value
@@ -112,86 +112,68 @@ float numToFloat(char*);                            //Converts a char array repr
 
 
 /* _____      _
-/ ____|    | |
+ / ____|    | |
 | (___   ___| |_ _   _ _ __
- \___ \ / _ \ __| | | | '_ \
+\___ \ / _ \ __| | | | '_ \
 ____) |  __/ |_| |_| | |_) |
 |_____/ \___|\__|\__,_| .__/
                       | |
                       |_|*/
 void setup(void) {
 
+	//turn on an LED to ensure the Teensy is getting power
 	pinMode(LED, OUTPUT);
-	
-	//temporary!!
-	z_k_1.accel = 102.8645;
-	z_k_1.vel = 6.7814;
-	z_k_1.alt = 0.3974;
-	z_k_1.time = 128;
-	z_k_2.accel = 110.7171;
-	z_k_2.vel = 31.5675;
-	z_k_2.alt = 4.7064;
-	z_k_2.time = 128+ 226;
-	z_k_3.accel = 138.1404;
-	z_k_3.vel = 61.2562;
-	z_k_3.alt = 15.9803;
-	z_k_3.time = 128 + 226 + 245;
+	digitalWrite(LED, HIGH);
 
-	// start serial port at //115200 bps:
+	// start serial port at any baud rate (Baud rate doesn't matter to teensy)
 	Serial.begin(38400);
-	delay(100);
+	delay(1000);
 	Serial.println("Serial has begun:");
+	Serial.println("...");
+	Serial.println("...");
 
+	//print out the title
+	printTitle();
+	
 	//Confirm connection with Java program
-	handShake();  // send a byte to establish contact until receiver responds
+	//handShake();  // send a byte to establish contact until receiver responds
 
-	//Initialize BMP180
-	delay(10);
-	digitalWrite(LED, HIGH); //turn on on-board LED
-
+	/********************INITIALIZE BMP180********************/
 	if (!bmp.begin()) {
 		Serial.println("NO Bmp180 DETECTED!");
 	} else {
 		bmp180_init = true;
-		Serial.println("Bmp180 :)");
+		Serial.println("Bmp180 Initialized");
 	}
+	/********************END INITIALIZE BMP180********************/
 
-	//Initialize BNO055
+	/********************INITIALIZE BNO055********************/
 	if (!bno.begin()) {
 		Serial.println("NO Bno055 DETECTED!");
 	} else {
 		bno055_init = true;
 		bno.setExtCrystalUse(true);
-		Serial.println("Bno055 :)");
+		Serial.println("Bno055 Initialized");
 	}
+	/********************END INITIALIZE BNO055********************/
 
-//  Initialize SD card
-  if(!sd.begin()){
-    Serial.println("SD card initialization failed!");
-  }
+	/********************INITIALIZE SD CARD********************/
+	  if(!sd.begin()){
+		Serial.println("No SD card DETECTED!");
+	  }
+	  else {
+		  Serial.println("SD card Initialized");
+		  newFlight();
+	  }
+	  /********************END INITIALIZE SD CARD********************/
   	
-	newFlight();
-
-
-	//State what debug levels are activated
-#if DEBUG_NORMAL
-	Serial.println("DEBUG_NORMAL");
-#endif
-#if DEBUG_ALPHA
-	Serial.println("DEBUG_ALPHA");
-#endif
-#if DEBUG_BRAVO
-	Serial.println("DEBUG_BRAVO");
-#endif
 #if TEST_MODE
 	Serial.println("TEST_MODE!;");
 #endif
 
-//	Serial.println("-------Menu-------");
+	Serial.println("-------Menu-------");
 }
 /********************END SETUP FUNCTION********************/
-
-
 
 
 /*__  __       _         _
@@ -200,30 +182,46 @@ void setup(void) {
 | |\/| |/ _` | | '_ \  | |    / _ \ / _ \| '_ \
 | |  | | (_| | | | | | | |___| (_) | (_) | |_) |
 |_|  |_|\__,_|_|_| |_| |______\___/ \___/| .__/
-											                   | |
-                    											|_| */
+										 | |
+                    					 |_| */
 void loop(void) {
 	if (Serial.available() > 0) {
-		// response = Serial.read();
-
-		//returnResponse(response);
 		switch (Serial.read()) {
 		case 'B':
 			Serial.println("Case B;");
+			//testNAN();
+			
+			eatYourBreakfast();
+			test();
 			eatYourBreakfast();
 			break;
-		case 'e':
-			Serial.println("Case e;");
+		case 'a':
+			Serial.println("Accelerometer test;");
 			eatYourBreakfast();
+			while (Serial.available() == 0) {
+				// Possible vector values can be:
+				// - VECTOR_ACCELEROMETER - m/s^2
+				// - VECTOR_MAGNETOMETER  - uT
+				// - VECTOR_GYROSCOPE     - rad/s
+				// - VECTOR_EULER         - degrees
+				// - VECTOR_LINEARACCEL   - m/s^2
+				// - VECTOR_GRAVITY       - m/s^2
+				imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
+
+				/* Display the floating point data */
+				Serial.print("X: ");
+				Serial.print(euler.x());
+				Serial.print(" Y: ");
+				Serial.print(euler.y());
+				Serial.print(" Z: ");
+				Serial.print(euler.z());
+				Serial.println("");
+				delay(500);
+			}	
 			break;
 		case 'k':
 			Serial.println("kalmaning;");
-			kalman(0, z_k_1, &filteredState_test);
-			printState(filteredState_test, "test 1");
-			kalman(0, z_k_2, &filteredState_test);
-			printState(filteredState_test, "test 2");
-			kalman(0, z_k_3, &filteredState_test);
-			printState(filteredState_test, "test 3");
+			quick_kalman_test();
 			eatYourBreakfast();
 			break;
 		case 'S':
@@ -235,6 +233,13 @@ void loop(void) {
 			}
 			else {
 				Serial.println("Entering Flight Mode;");
+				#if !TEST_MODE  //zero the pad altitude
+					padAlt = altitude_plz();
+					delay(30);
+					padAlt = altitude_plz();
+					Serial.print("Launch pad altitude = ");
+					Serial.println(padAlt);
+				#endif
 				delay(2000);
 				flightMode();
 			}
@@ -244,17 +249,14 @@ void loop(void) {
 			Serial.println(response);
 			break;
 		}
-		Serial.println("-------Menu-------;");
+		Serial.println("-------Menu---------;");
 	}
 }
 /*********************END LOOP FUNCTION*********************/
 
 
-
-
 /********************BEGIN FUNCTION DEFINITIONS********************/
-/* 
-  ______ _ _       _     _     __  __           _        ______                _   _                 
+/*______ _ _       _     _     __  __           _        ______                _   _                 
  |  ____| (_)     | |   | |   |  \/  |         | |      |  ____|              | | (_)                
  | |__  | |_  __ _| |__ | |_  | \  / | ___   __| | ___  | |__ _   _ _ __   ___| |_ _  ___  _ __  ___ 
  |  __| | | |/ _` | '_ \| __| | |\/| |/ _ \ / _` |/ _ \ |  __| | | | '_ \ / __| __| |/ _ \| '_ \/ __|
@@ -262,8 +264,6 @@ void loop(void) {
  |_|    |_|_|\__, |_| |_|\__| |_|  |_|\___/ \__,_|\___| |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/
               __/ |                                                                                  
              |___/ */
-
-
 /**************************************************************************/
 /*!
 @brief  Prepares varaibles for new launch
@@ -277,7 +277,11 @@ void newFlight(void) {
   if(!data){
     Serial.println("Data file unable to initiated.;"); 
   } else {
-    data.println("t(ms), alt(m), vel(m/s), accel(m/s^2), kalman altitude(m), kalman velocity(m/s), kalman acceleration(m/s^2)");
+    #if TEST_MODE
+    data.println("leftVel, rightVel, t(s), alt(m), vel(m/s), accel(m/s^2), kalman altitude(m), kalman velocity(m/s), kalman acceleration(m/s^2)");
+    #else
+    data.println("xG(m/s^2), yG(m/s^2), zG(m/s^2), xL(m/s^2), yL(m/s^2), zL(m/s^2), leftVel, rightVel, heading(degrees), roll(degrees), pitch(degrees), t(s), alt(m), vel(m/s), accel(m/s^2), kalman altitude(m), kalman velocity(m/s), kalman acceleration(m/s^2)");
+    #endif
     data.close();
   }
 
@@ -298,7 +302,7 @@ void initializePastStates(void){
     pastRawStates[i].alt = (float)(0);
     pastRawStates[i].vel = (float)(0);
     pastRawStates[i].accel = (float)(0);
-    pastRawStates[i].time = (float)(0);
+    pastRawStates[i].time = 0;
   }
 }
 
@@ -306,32 +310,23 @@ void initializePastStates(void){
 /**************************************************************************/
 /*!
 @brief  Launch and test sequence.
-Author: Jake
+Author: Jake & Ben
 */
 /**************************************************************************/
 void flightMode(void) {
 	struct stateStruct rawState, filteredState;
 
-	while (Serial.available() == 0) {
+	while (Serial.available() == 0){
 
-#if TEST_MODE 
-//		Serial.println(";");
-//		Serial.println("TEST_MODE!;");
-//		Serial.println(";");
-    
-#endif
-		//just in case
-		if (!bmp180_init) {
-			Serial.println("WARNING: bmp180 not initialized!;");
-		}
-		if (!bno055_init) {
-			Serial.println("WARNING: bno055 not initialized!;");
-		}
-
-    getRawState(&rawState);
-//    Serial.prin
+		//get the state, filter it, record it		
+		getRawState(&rawState);		
 		kalman(encPos, rawState, &filteredState);
-		writeToFile(rawState, filteredState);
+		storeStructs(rawState, filteredState);
+
+		#if DEBUG_FLIGHTMODE
+		printState(rawState, "raw state");
+		printState(filteredState, "filtered state");
+		#endif
 	}
 	//if some serial input ~= to the standdown code or 1 second passes, call flightmode again...  need to discuss
 } //END flightMode(void)
@@ -340,32 +335,30 @@ void flightMode(void) {
   /**************************************************************************/
   /*!
   @brief  Gathers data from the desired source (Sensors or file).  Dependent on TEST_MODE
-  Author: Jake
+  Author: Jake & Ben
   */
   /**************************************************************************/
 void getRawState(struct stateStruct* rawState) {
-//	static struct stateStruct rawState; //needs to be static because of the altitude reading (ask Ben)
+//static struct stateStruct rawState; //needs to be static because of the altitude reading (ask Ben)
 #if TEST_MODE
 //testMode code
 readFromFile(rawState);
-
+rawState->accel = -1 * (rawState->accel); //flip around acceleration
+rawState->time = (rawState->time) + 500;  //test for rounding error at later times
 #else
+	//get raw altitude
+	rawState->alt = altitude_plz() - padAlt;
 
-  //get raw altitude
-  altitude_plz(rawState);
-  rawState->alt -= padAlt;
+	//get time
+	rawState->time = (float)micros() / 1000000;
+	
+	//get raw acceleration	
+	rawState->accel = getAcceleration_2();
 
-  //get time
-	rawState->time = (float)millis() / 1000;
-
-
-	//get raw acceleration
-	rawState->accel = getAcceleration();
 #endif
 
 	//calculate velocity
 	rawState->vel = calculateVelocity(*rawState);
-
 
 #if DEBUG_RAWSTATE
 	Serial.println();
@@ -385,21 +378,32 @@ Author: Jake & Ben
 float calculateVelocity(struct stateStruct rawState) 	{	//VARIABLES NEEDED FOR CALULATION
   float sumTimes = 0, sumTimes2 = 0, sumAlt = 0, sumAltTimes = 0, leftSide = 0;
   float rightSide = 0, numer = 0, denom=0, aMax = 0, aMin = 0, rSA = 0, rSB = 0;
-
-  printPastStates(pastRawStates);
+  float velocity;
 
 	//shift new readings into arrays	 
 	for (uint8_t i = BUFF_N; i > 0; i--) {
     copyState(&pastRawStates[i],&pastRawStates[i-1]);
 	}
-  copyState(&pastRawStates[0],&rawState);
+	rawState.buff_t = 0;
+	copyState(&pastRawStates[0], &rawState);
+
+	//time relative to the current moment
+	for (uint8_t i = BUFF_N; i > 0; i--) {
+		pastRawStates[i - 1].buff_t = pastRawStates[i - 1].time - rawState.time;
+	}
+
+	#if DEBUG_VELOCITY && DEBUG_DELTA
+		Serial.println("");
+		Serial.println("Past states post-shift");
+		printPastStates(pastRawStates);
+	#endif
 
 	//FIND SUMS FOR BMP
 	for (unsigned int i = 0; i < BUFF_N; i++) {
-		sumTimes += (pastRawStates[i].time);
-		sumTimes2 += ((pastRawStates[i].time) * (pastRawStates[i].time));
+		sumTimes += (float)(pastRawStates[i].buff_t) ;
+		sumTimes2 += (float)((pastRawStates[i].buff_t) * (pastRawStates[i].buff_t));
 		sumAlt += pastRawStates[i].alt;
-		sumAltTimes += (pastRawStates[i].time * pastRawStates[i].alt);
+		sumAltTimes += ((float)pastRawStates[i].buff_t * pastRawStates[i].alt);
 	}
 
 	//CALCULATE LEFT SIDE OF EQUATION
@@ -407,8 +411,28 @@ float calculateVelocity(struct stateStruct rawState) 	{	//VARIABLES NEEDED FOR C
 	denom = ((sumTimes*sumTimes) - (BUFF_N * sumTimes2));
 	leftSide = numer / denom;
 
+  storeInfo(leftSide);
+  storeInfo(rightSide);
+
 	//CALCULATE RIGHT SIDE OF EQUATION
-	for (unsigned int i = 0; i < (BUFF_N/2); i++) {
+	#if DEBUG_VELOCITY && DEBUG_EMERGENCY
+	Serial.println("");
+	Serial.println("Rightside: ");
+	#endif
+
+	//rightSide += 0.5 * (pastRawStates[0].accel - pastRawStates[1].accel) * (pastRawStates[0].buff_t - pastRawStates[1].buff_t);
+	//rightSide += 0.5 * (pastRawStates[BUFF_N / 2 - 1].accel - pastRawStates[BUFF_N / 2].accel) * (pastRawStates[BUFF_N / 2 - 1].buff_t - pastRawStates[BUFF_N / 2].buff_t);
+	for (unsigned int i = 0; i <= (BUFF_N / 2 ); i++) {
+		rightSide += 0.5 * (pastRawStates[i].accel + pastRawStates[i + 1].accel) * (pastRawStates[i].buff_t - pastRawStates[i + 1].buff_t);
+		#if DEBUG_VELOCITY && DEBUG_EMERGENCY
+		Serial.print(i);
+		Serial.print(") rightSide = ");
+		Serial.println(rightSide,6);
+		#endif
+	}
+
+
+	/*for (unsigned int i = 0; i < (BUFF_N/2); i++) {
     if(pastRawStates[i].accel > pastRawStates[i + 1].accel){
       aMax = pastRawStates[i].accel; 
       aMin = pastRawStates[i + 1].accel;
@@ -429,41 +453,52 @@ float calculateVelocity(struct stateStruct rawState) 	{	//VARIABLES NEEDED FOR C
     } ///TO DO ELSE
 
     rightSide = (.5*(rSA)*((pastRawStates[i].time) - (pastRawStates[i+1].time))) + (aMax * (pastRawStates[i].time) - (pastRawStates[i+1].time));
-	}
+	}*/
 
 #if DEBUG_VELOCITY
 	Serial.println();
 	Serial.println("VELOCITY--------------------;");
 	Serial.print("leftSide: ");
-	Serial.print(leftSide);
+	Serial.print(leftSide, 3);
   Serial.println(";");
 	Serial.print("numer: ");
-	Serial.print(numer);
+	Serial.print(numer, 3);
   Serial.println(";");
 	Serial.print("denom: ");
-	Serial.print(denom);
+	Serial.print(denom, 3);
   Serial.println(";");
 	Serial.print("rightSide: ");
-	Serial.print(rightSide);
+	Serial.print(rightSide, 6);
   Serial.println(";");
 	Serial.print("sumTimes: ");
-	Serial.print(sumTimes);
+	Serial.print(sumTimes, 3);
   Serial.println(";");
 	Serial.print("sumTimes2: ");
-	Serial.print(sumTimes2);
+	Serial.print(sumTimes2, 3);
   Serial.println(";");
 	Serial.print("sumAlt: ");
-	Serial.print(sumAlt);
+	Serial.print(sumAlt, 3);
   Serial.println(";");
 	Serial.print("sumAltTimes: ");
-	Serial.print(sumAltTimes);
+	Serial.print(sumAltTimes, 3);
   Serial.println(";");
   Serial.print("Velocity ");
-  Serial.print(rightSide+leftSide);
+  Serial.print(rightSide+leftSide, 3);
   Serial.println(";");
 #endif
 
-	return (leftSide + rightSide);
+	velocity = (leftSide + rightSide);
+  if isnan(velocity) {//errorlog
+	  Serial.println("vel is nan!");
+	  velocity = 0;
+  }
+  if ((velocity > MAX_EXP_VEL) || (velocity < -10)) { //errorlog
+	  Serial.print("Velocity non-nominal! = ");
+	  Serial.println(velocity);
+	  velocity = 0;
+	  //delay(5000); //TEMPORARY
+  }
+  return velocity;
 }// END calculateVelocity()
 
 
@@ -478,54 +513,7 @@ void copyState(struct stateStruct* destination, struct stateStruct* original){
   destination->vel = original->vel;
   destination->accel = original->accel;
   destination->time = original->time;
-}
-
-/**************************************************************************/
-/*!
-@brief  Prints one state and it's location in the pastRawStates array
-Author: Jake
-*/
-/**************************************************************************/
-void printState(struct stateStruct state, int label) {
-  Serial.print(label);
-  Serial.print(") alt = ");
-  Serial.print(state.alt);
-  Serial.print(", vel = ");
-  Serial.print(state.vel);
-  Serial.print(", accel = ");
-  Serial.print(state.accel);
-  Serial.print(", time = ");
-  Serial.print(state.time);
-  Serial.println(");");
-} //End printState()
-
-
-/**************************************************************************/
-/*!
-@brief  prints the state struct
-Author: Ben
-*/
-/**************************************************************************/
-void printState(struct stateStruct state, String label) {
-  Serial.println();
-  Serial.println(label);
-  Serial.println(state.alt);
-  Serial.println(state.vel);
-  Serial.println(state.accel);
-  Serial.println(state.time);
-}
-
-
-/**************************************************************************/
-/*!
-@brief  Prints all pastRawState values.
-Author: Jake
-*/
-/**************************************************************************/
-void printPastStates(struct stateStruct* pastStates) {
-  for(int i = 0; i < BUFF_N; i++){
-    printState(pastStates[i], i);
-  }
+  destination->buff_t = original->buff_t;
 }
 
 
@@ -537,8 +525,7 @@ void printPastStates(struct stateStruct* pastStates) {
  | |_) | | | | | | |_) | | (_) | |_| | | |  | |_| | | | | (__| |_| | (_) | | | \__ \
  |____/|_| |_| |_| .__/|_|\___/ \___/  |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/
                  | |
-                 |_|
- */
+                 |_| */
  /**************************************************************************/
  /*!
  @brief  Checks if Bmp180 has a reading ready, retrieves reading and requests a new readings if yes, returns false if not ready yet
@@ -546,10 +533,11 @@ void printPastStates(struct stateStruct* pastStates) {
  Author: Ben
  */
  /**************************************************************************/
-bool altitude_plz(struct stateStruct *rawState) {
+float altitude_plz(void) {
+	static float returnVal;
 	float pressure_kPa;
 	float pressure_; //units are Pa*10?
-	printState(*rawState, "rawstate in alt");
+
 	if (bmp.RCR_readyYet()) {
 		bmp.RCR_getPressure(&pressure_kPa);  //picks up the pressure reading from the Bmp180, then puts in a request for a new one
 #if DEBUG_ALPHA
@@ -560,7 +548,7 @@ bool altitude_plz(struct stateStruct *rawState) {
 #endif
 		pressure_ = pressure_kPa / 100.0F;
 		//*altitude = (bmp.pressureToAltitude(SENSORS_PRESSURE_SEALEVELHPA, pressure_));
-		rawState->alt = (bmp.pressureToAltitude(SENSORS_PRESSURE_SEALEVELHPA, pressure_));
+		//rawState->alt = (bmp.pressureToAltitude(SENSORS_PRESSURE_SEALEVELHPA, pressure_));
 
 #if DEBUG_ALPHA
 		Serial.print("RCR_getPressure returned: ");
@@ -570,13 +558,11 @@ bool altitude_plz(struct stateStruct *rawState) {
 		Serial.print("  altitude = ");
 		Serial.println(rawState->alt);
 #endif
-		return true;
-	}
-	else {
-		return false;
-	}
+		returnVal = bmp.pressureToAltitude(SENSORS_PRESSURE_SEALEVELHPA, pressure_);
+		//return true;
+	}//else return false
+	return returnVal;
 }
-
 
 
 /*____               ___  _____ _____   ______                _   _
@@ -623,9 +609,65 @@ float getAcceleration(void) {
     verticalAcceleration = magOfVerticalAcceleration * -1;
   }
 
+  storeInfo(xG);
+  storeInfo(yG);
+  storeInfo(zG);
+
+  storeInfo(xL);
+  storeInfo(yL);
+  storeInfo(zL);
+
   return verticalAcceleration;
 }//END getAcceleration();
 
+ /**************************************************************************/
+ /*!
+ @brief  Returns the vertical acceleration as a floating point value
+ Author: Jake with edits by Ben
+ */
+ /**************************************************************************/
+float getAcceleration_2(void) {
+	imu::Vector<3> gravity = bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
+	imu::Vector<3> linear = bno.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
+	float linearDotGravity = 0, theta = 0, defOfProduct = 0, magOfVerticalAcceleration = 0, verticalAcceleration = 0, magL = 0, magG = 0;
+	float xG = 0, yG = 0, zG = 0, xL = 0, yL = 0, zL = 0;
+
+	xG = (float)gravity.x();
+	yG = (float)gravity.y();
+	zG = (float)gravity.z();
+
+	xL = (float)linear.x();
+	yL = (float)linear.y();
+	zL = (float)linear.z();
+
+#if DEBUG_GETACCELERATION
+	Serial.println("");
+	Serial.println("GETACCELERATION---------------------");
+	Serial.print("xG = ");
+	Serial.print(xG);
+	Serial.print("\t yG = ");
+	Serial.print(yG);
+	Serial.print("\t zG = ");
+	Serial.println(zG);
+	Serial.print("xL = ");
+	Serial.print(xL);
+	Serial.print("\t yL = ");
+	Serial.print(yL);
+	Serial.print("\t zL = ");
+	Serial.println(zL);
+#endif
+
+  storeInfo(xG);
+  storeInfo(yG);
+  storeInfo(zG);
+
+  storeInfo(xL);
+  storeInfo(yL);
+  storeInfo(zL);
+
+	linearDotGravity = (xG*xL) + (yG*yL) + (zG*zL);
+	return (linearDotGravity / 9.81 - 9.81);
+}
 
 /**************************************************************************/
 /*!
@@ -661,60 +703,6 @@ void calibrateBNO(void) {
 }
 
 
- /*/$$$$$$  /$$   /$$ /$$$$$$       /$$$$$$$$                              /$$     /$$
- / $$__  $$| $$  | $$|_  $$_/      | $$_____/                             | $$    |__/
- | $$  \__/| $$  | $$  | $$        | $$    /$$   /$$ /$$$$$$$   /$$$$$$$ /$$$$$$   /$$  /$$$$$$  /$$$$$$$   /$$$$$$$
- | $$ /$$$$| $$  | $$  | $$        | $$$$$| $$  | $$| $$__  $$ /$$_____/|_  $$_/  | $$ /$$__  $$| $$__  $$ /$$_____/
- | $$|_  $$| $$  | $$  | $$        | $$__/| $$  | $$| $$  \ $$| $$        | $$    | $$| $$  \ $$| $$  \ $$|  $$$$$$
- | $$  \ $$| $$  | $$  | $$        | $$   | $$  | $$| $$  | $$| $$        | $$ /$$| $$| $$  | $$| $$  | $$ \____  $$
- |  $$$$$$/|  $$$$$$/ /$$$$$$      | $$   |  $$$$$$/| $$  | $$|  $$$$$$$  |  $$$$/| $$|  $$$$$$/| $$  | $$ /$$$$$$$/
- \______/  \______/ |______/      |__/    \______/ |__/  |__/ \_______/   \___/  |__/ \______/ |__/  |__/|_______/ */
- /**************************************************************************/
- /*!
- @brief  Initializes and confirms connection with Java program.
- Author: Jake
- */
- /**************************************************************************/
-void handShake() {
-	while (Serial.available() <= 0) {
-		Serial.write('~');   // send a ~ until a response is received.
-		delay(300);
-	}
-} //END handShake()
-
-  /**************************************************************************/
-  /*!
-  @brief  Clears the serial buffer.. This
-  is helpful for carriage returns and things of that sort that
-  hang around after you got what you wanted.
-  Author: Ben
-  */
-  /**************************************************************************/
-void eatYourBreakfast() {
-	while (Serial.available() > 0) {
-		delay(2);
-		Serial.read();
-	}
-}
-
-/**************************************************************************/
-/*!
-@brief  Returns a received response from the Java program to ensure successful delivery
-Author: Jake
-*/
-/**************************************************************************/
-void returnResponse(char response) {
-	if (response == '~') {
-		;
-	}
-	else {
-		Serial.print(response);
-		Serial.print(" RECEIVED;");
-		Serial.flush();
-	}
-} //END returnResponse()
-
-
   /*
   _  __     _                         ______                _   _
   | |/ /    | |                       |  ____|              | | (_)
@@ -730,10 +718,9 @@ void returnResponse(char response) {
   */
   /**************************************************************************/
 void kalman(int16_t encPos, struct stateStruct rawState, struct stateStruct* filteredState) {
-	//static float x_k[3] = { 0, 0, 0 };
-	static unsigned long lastTime;
-	uint16_t delta_t;
-	float x_k[3];
+	static float x_k[3] = { 0, 0, 0 };
+	static float lastTime;
+	float delta_t;
 	float z_k[3];
 	static float p_k[3][3] = {
 		{ 0, 0, 0 },
@@ -756,62 +743,81 @@ void kalman(int16_t encPos, struct stateStruct rawState, struct stateStruct* fil
 		{ 0, 0, 0 }
 	};
 
-	x_k[0] = filteredState->alt;
-	x_k[1] = filteredState->vel;
-	x_k[2] = filteredState->accel;
+	//x_k[0] = filteredState->alt;
+	//x_k[1] = filteredState->vel;
+	//x_k[2] = filteredState->accel;
 
 	z_k[0] = rawState.alt;
 	z_k[1] = rawState.vel;
 	z_k[2] = rawState.accel;
 
 	delta_t = rawState.time - lastTime;
+	Serial.println(""); //temp
+	Serial.print("delta t = ");
+	Serial.println(delta_t, 6);
 	lastTime = rawState.time;
 
 	b_k[0] = delta_t*delta_t;
 	b_k[0] = b_k[0] / 2;
-	b_k[1] = (float)delta_t;
+	b_k[1] = delta_t;
 	b_k[2] = 1;
 
-	f_k[0][1] = (float)delta_t;
+	f_k[0][1] = delta_t;
 
 #if DEBUG_KALMAN
-	Serial.println("Kalman");
+	Serial.println("KALMAN---------------------");
 	Serial.print("delta_t = "); //temp
 	Serial.println(delta_t); //temp
+	Serial.print("t = "); //temp
+	Serial.println(rawState.time); //temp
 	Matrix.Print(x_k, 3, 1, "x_k"); //temp
 	Matrix.Print((float*)f_k, 3, 3, "f_k"); //temp
 	Matrix.Print(b_k, 3, 1, "b_k"); //temp
+	Matrix.Print(z_k, 3, 1, "z_k"); //temp
 #endif
 
+	//calculate what Kalman thinks the acceleration is
 	c_d = CD_R*(1 - encPos / ENC_RANGE) + CD_B / ENC_RANGE;
 	area = A_R*(1 - encPos / ENC_RANGE) + A_B / ENC_RANGE;
-	q = RHO * (z_k[1]) * (z_k[1]) / 2;
+	q = RHO * rawState.vel * rawState.vel / 2;
 	u_k = -9.81 - c_d * area * q / POST_BURN_MASS;
+
 	// if acceleration > 10m/s^2 the motor is probably burning and we should add that in to u_k
 	if (z_k[2] > 10) {
+		Serial.println("Burn Phase!"); //errorlog
 		u_k += AVG_MOTOR_THRUST / POST_BURN_MASS;
+	}
+	else if ((z_k[0] < 20) && (z_k[0] > -20)) {
+		u_k = 0;
+		Serial.print("On the pad! Altitude = "); //errorlog
+		Serial.println(z_k[0]);
+	}
+	if isnan(u_k) { //caused by velocity being nan //errorlog
+		Serial.println("u_k is nan!");
+		u_k = 0;
 	}
 
 #if DEBUG_KALMAN
+	Serial.println("");
 	Serial.print("u_k = ");
 	Serial.println(u_k);
-	//Serial.print("c_d = "); //temp
-	//Serial.println(c_d); //temp
-	//Serial.print("area = "); //temp
-	//Serial.println(area); //temp
-	//Serial.print("q = "); //temp
-	//Serial.println(q); //temp
+	Serial.print("c_d = "); //temp
+	Serial.println(c_d); //temp
+	Serial.print("area = "); //temp
+	Serial.println(area); //temp
+	Serial.print("q = "); //temp
+	Serial.println(q); //temp
 #endif
 
 	//Predict----------------------------
 	//x_k = u_k*b_k + f_k*x_k
 	Matrix.Scale((float*)b_k, 3, 1, u_k);
-	Matrix.Multiply((float *)f_k, (float *)x_k, 3, 3, 1, placeHolder_3_1);
+	Matrix.Multiply((float *)f_k, (float *)x_k, 3, 3, 1, (float*)placeHolder_3_1);
 	Matrix.Add((float*)b_k, (float*)placeHolder_3_1, 3, 1, (float*)x_k);
 
 #if DEBUG_KALMAN
-	//Matrix.Print(b_k, 3, 1, "u_k*b_k"); 
-	//Matrix.Print(placeHolder_3_1, 3, 1, "f_k*x_k"); 
+	Matrix.Print(b_k, 3, 1, "u_k*b_k"); 
+	Matrix.Print(placeHolder_3_1, 3, 1, "f_k*x_k"); 
 	Matrix.Print(x_k, 3, 1, "x_k predict");
 #endif
 
@@ -853,6 +859,33 @@ void kalman(int16_t encPos, struct stateStruct rawState, struct stateStruct* fil
 	filteredState->time = rawState.time;
 }
 
+/**************************************************************************/
+/*!
+@brief  Initializes some dummy state variables used to test the Kalman filter
+Author: Ben
+*/
+/**************************************************************************/
+void quick_kalman_test(void) {
+	z_k_1.accel = 102.8645;
+	z_k_1.vel = 6.7814;
+	z_k_1.alt = 0.3974;
+	z_k_1.time = (float)128 / 1000;
+	z_k_2.accel = 110.7171;
+	z_k_2.vel = 31.5675;
+	z_k_2.alt = 4.7064;
+	z_k_2.time = (float)(128 + 226) / 1000;
+	z_k_3.accel = 138.1404;
+	z_k_3.vel = 61.2562;
+	z_k_3.alt = 15.9803;
+	z_k_3.time = (float)(128 + 226 + 245) / 1000;
+
+	kalman(0, z_k_1, &filteredState_test);
+	printState(filteredState_test, "test 1");
+	kalman(0, z_k_2, &filteredState_test);
+	printState(filteredState_test, "test 2");
+	kalman(0, z_k_3, &filteredState_test);
+	printState(filteredState_test, "test 3");
+}
 
 /*           ,,    ,,                                                                                     ,,                             
 `7MM"""YMM db  `7MM              `7MMF' .g8""8q.       `7MM"""YMM                                mm     db                             
@@ -862,36 +895,65 @@ void kalman(int16_t encPos, struct stateStruct rawState, struct stateStruct* fil
   MM   Y   MM    MM 8M""""""       MM MM.      ,MP       MM   Y   MM    MM    MM    MM 8M        MM     MM 8M     M8 MM    MM  `YMMMa. 
   MM       MM    MM YM.    ,       MM `Mb.    ,dP'       MM       MM    MM    MM    MM YM.    ,  MM     MM YA.   ,A9 MM    MM  L.   I8 
 .JMML.   .JMML..JMML.`Mbmmd'     .JMML. `"bmmd"'       .JMML.     `Mbod"YML..JMML  JMML.YMbmd'   `Mbmo.JMML.`Ybmd9'.JMML  JMML.M9mmmP' */
+
 /**************************************************************************/
 /*!
-@brief  Writes data to a file
+@brief  Stores one data point to VDSv2FlightData.dat
 Author: Jake
 */
 /**************************************************************************/
-void writeToFile(struct stateStruct sensorData, struct stateStruct kalmanData){
+void storeInfo(float dataPoint){
   File myFile = sd.open("VDSv2FlightData.dat", FILE_WRITE);
 
   if(myFile) {
-    Serial.print("Writing data to test.dat;");
+    myFile.printf("%0.3f",dataPoint);
+    myFile.print(",");
   } else {
-    Serial.print("Unable to open test.dat;");
+    Serial.print("Unable to open VDSv2FlightData.dat;");
   }
-    myFile.print(sensorData.time);
-    myFile.print(",");
-    myFile.print(sensorData.alt);
-    myFile.print(",");
-    myFile.print(sensorData.vel);
-    myFile.print(",");
-    myFile.print(sensorData.accel);
-    myFile.print(",");
-    myFile.print(kalmanData.alt);
-    myFile.print(",");
-    myFile.print(kalmanData.vel);
-    myFile.print(",");
-    myFile.print(kalmanData.accel);
-    myFile.println("");
     myFile.close();
-} //END writeToFile()
+}
+
+/**************************************************************************/
+/*!
+@brief  Stores all information from both structs to VDSv2FlightData.dat and ends the line.
+Author: Jake
+*/
+/**************************************************************************/
+void storeStructs(struct stateStruct sensorData, struct stateStruct kalmanData){
+  File myFile = sd.open("VDSv2FlightData.dat", FILE_WRITE);
+  #if !TEST_MODE
+  imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
+  #endif
+  
+  if(myFile) {
+    #if !TEST_MODE
+    myFile.printf("%0.2f",euler.x());
+    myFile.print(",");
+    myFile.printf("%0.2f",euler.y());
+    myFile.print(",");
+    myFile.printf("%0.2f",euler.z());
+    myFile.print(",");
+    #endif
+    myFile.printf("%0.6f",sensorData.time);
+    myFile.print(",");
+    myFile.printf("%0.3f",sensorData.alt);
+    myFile.print(",");
+    myFile.printf("%0.4f",sensorData.vel);
+    myFile.print(",");
+    myFile.printf("%0.3f",sensorData.accel);
+    myFile.print(",");
+    myFile.printf("%0.3f",kalmanData.alt);
+    myFile.print(",");
+    myFile.printf("%0.4f",kalmanData.vel);
+    myFile.print(",");
+    myFile.printf("%0.3f",kalmanData.accel);
+    myFile.println("");
+  } else {
+    Serial.print("Unable to open VDSv2FlightData.dat;");
+  }
+    myFile.close();
+}
 
 
 /**************************************************************************/
@@ -901,7 +963,7 @@ Author: Jake
 */
 /**************************************************************************/
 void readFromFile(struct stateStruct* destination){
-  File myFile = sd.open("8_6_16_test.dat", FILE_READ);
+  File myFile = sd.open(TEST_FILENAME, FILE_READ);
   char place = '\n';
   char number[20] = {NULL};
   short numPlace = 0, numCount = 0;
@@ -948,15 +1010,18 @@ void readFromFile(struct stateStruct* destination){
         
       } else {
         if((numCount % ((linePlaceHolder+1)*3)) == 0){
-          Serial.print("Time: ");
-          Serial.print(destination->time);
-          Serial.print(";");
-          Serial.print("Altitude: ");
-          Serial.print(destination->alt);
-          Serial.print(";");
-          Serial.print("Acceleration: ");
-          Serial.print(destination->accel);
-          Serial.print(";");
+#if DEBUG_READFROMFILE
+			Serial.println("");
+			Serial.print("Time: ");
+			Serial.print(destination->time);
+		    Serial.print(";");
+			Serial.print("Altitude: ");
+			Serial.print(destination->alt);
+			Serial.print(";");
+			Serial.print("Acceleration: ");
+			Serial.print(destination->accel);
+			Serial.print(";");
+#endif
           linePlaceHolder++;
           break;
         }
@@ -996,7 +1061,6 @@ float charToFloat(char input){
   temp -= 48;
   return float(temp);
 } //END charToFloat();
-
 
 /**************************************************************************/
 /*!
@@ -1043,4 +1107,171 @@ float numToFloat(char* number){
   }
   return result;
 } //END numToFloat();
+
+
+
+
+/*/$$$$$$  /$$   /$$ /$$$$$$       /$$$$$$$$                              /$$     /$$
+/ $$__  $$| $$  | $$|_  $$_/      | $$_____/                             | $$    |__/
+| $$  \__/| $$  | $$  | $$        | $$    /$$   /$$ /$$$$$$$   /$$$$$$$ /$$$$$$   /$$  /$$$$$$  /$$$$$$$   /$$$$$$$
+| $$ /$$$$| $$  | $$  | $$        | $$$$$| $$  | $$| $$__  $$ /$$_____/|_  $$_/  | $$ /$$__  $$| $$__  $$ /$$_____/
+| $$|_  $$| $$  | $$  | $$        | $$__/| $$  | $$| $$  \ $$| $$        | $$    | $$| $$  \ $$| $$  \ $$|  $$$$$$
+| $$  \ $$| $$  | $$  | $$        | $$   | $$  | $$| $$  | $$| $$        | $$ /$$| $$| $$  | $$| $$  | $$ \____  $$
+|  $$$$$$/|  $$$$$$/ /$$$$$$      | $$   |  $$$$$$/| $$  | $$|  $$$$$$$  |  $$$$/| $$|  $$$$$$/| $$  | $$ /$$$$$$$/
+\______/  \______/ |______/      |__/    \______/ |__/  |__/ \_______/   \___/  |__/ \______/ |__/  |__/|_______/ */
+/**************************************************************************/
+/*!
+@brief  Initializes and confirms connection with Java program.
+Author: Jake
+*/
+/**************************************************************************/
+void handShake() {
+	while (Serial.available() <= 0) {
+		Serial.write('~');   // send a ~ until a response is received.
+		delay(300);
+	}
+} //END handShake()
+
+  /**************************************************************************/
+  /*!
+  @brief  Clears the serial buffer.. This
+  is helpful for carriage returns and things of that sort that
+  hang around after you got what you wanted.
+  Author: Ben
+  */
+  /**************************************************************************/
+void eatYourBreakfast() {
+	while (Serial.available() > 0) {
+		delay(2);
+		Serial.read();
+	}
+}
+
+/**************************************************************************/
+/*!
+@brief  Returns a received response from the Java program to ensure successful delivery
+Author: Jake
+*/
+/**************************************************************************/
+void returnResponse(char response) {
+	if (response == '~') {
+		;
+	}
+	else {
+		Serial.print(response);
+		Serial.print(" RECEIVED;");
+		Serial.flush();
+	}
+} //END returnResponse()
+
+  /**************************************************************************/
+  /*!
+  @brief  Prints one state and it's location in the pastRawStates array
+  Author: Jake
+  */
+  /**************************************************************************/
+void printState(struct stateStruct state, int label) {
+	Serial.print(label);
+	Serial.print(") alt = ");
+	Serial.print(state.alt, 4);
+	Serial.print(", vel = ");
+	Serial.print(state.vel, 4);
+	Serial.print(", accel = ");
+	Serial.print(state.accel, 4);
+	Serial.print(", time = ");
+	Serial.print(state.time);
+	Serial.print(", buff_t = ");
+	Serial.print(state.buff_t, 4);
+	Serial.println(");");
+} //End printState()
+
+
+  /**************************************************************************/
+  /*!
+  @brief  prints the state struct
+  Author: Ben
+  */
+  /**************************************************************************/
+void printState(struct stateStruct state, String label) {
+	Serial.println();
+	Serial.println(label);
+	Serial.print("alt =   ");
+	Serial.println(state.alt, 3);
+	Serial.print("vel =   ");
+	Serial.println(state.vel, 4);
+	Serial.print("accel = ");
+	Serial.println(state.accel, 3);
+	Serial.print("t =     ");
+	Serial.println(state.time, 6);
+}
+
+
+/**************************************************************************/
+/*!
+@brief  Prints all pastRawState values.
+Author: Jake
+*/
+/**************************************************************************/
+void printPastStates(struct stateStruct* pastStates) {
+	Serial.println("");
+	for (int i = 0; i < BUFF_N; i++) {
+		printState(pastStates[i], i);
+	}
+}
+
+/**************************************************************************/
+/*!
+@brief  Prints out the title sequence
+Author: Ben
+*/
+/**************************************************************************/
+
+void printTitle(void) {
+	//remember backslahses have to be double backslashed to print correctly
+	Serial.println("             __      _______   _____  __      _____ ");
+	Serial.println("             \\ \\    / /  __ \\ / ____| \\ \\    / /__ \\ ");
+	Serial.println("              \\ \\  / /| |  | | (___    \\ \\  / /   ) | ");
+	Serial.println("               \\ \\/ / | |  | |\\___ \\    \\ \\/ /   / / ");
+	Serial.println("                \\  /  | |__| |____) |    \\  /   / /_ ");
+	Serial.println("                 \\/   |_____/|_____/      \\/   |____| ");
+	Serial.println("");
+	Serial.println("             River City Rocketry's Variable Drag System");
+	Serial.println(" \t\t December 2016 Sensor/Filter Tests");
+	Serial.println("");
+	Serial.println("Software written by Jake Cassady, Ben Stringer, Lydia Sharp, and Denny Joy.");
+	Serial.println("With help from libraries written by Adafruit Industries.");
+	Serial.println("Mechanical hardware developed by Justin Johnson.");
+	Serial.println("Electrical hardware developed by Kenny Dang and Alora Mazarakis.");
+	Serial.println("");
+}
+
+/**************************************************************************/
+/*!
+@brief  Just a place for quick tests
+Author: Ben
+*/
+/**************************************************************************/
+void testNAN(void){
+	float a, b, c;
+	a = 0;
+	b = 0;
+	c = a * b;
+	Serial.println("testNAN");
+	Serial.println(c);
+		if (isnan(c)) {
+			Serial.println("c is nan");
+		}
+}
+
+void test(void) {
+	float a = 0.3456;
+	int b;
+	b = 1000 * a;
+	Serial.println(a,5);
+	while (Serial.available() == 0) {
+		a = (float)micros() / 1000000;
+		Serial.println(a, 6);
+		delay(5);
+	}
+}
 /*********************END FUNCTION DEFINITIONS*********************/
