@@ -94,6 +94,8 @@ long getPadAlt(void);                                           //Finds pad alti
 float getAcceleration(void);                                    //Returns the vertical acceleration as a floating point value
 void calibrateBNO(void);                                        //Enters program into a calibration mode, requiring the BNO's acceleration calibration
                                                                 //value to reach 3 before exiting.
+void testCalibration(void);                                     //Checks if accelerometer is calibrated, logs error if not.
+
 /*Kalman Functions*/
 void kalman(int16_t, struct stateStruct, struct stateStruct*);  //Filters the state of the vehicle
 
@@ -105,6 +107,7 @@ void resetNumber(char*);                                        //Resets (char)n
 float charToFloat(char);                                        //Converts a char number to a floating point value
 float numToFloat(char*);                                        //Converts a char array representing a number into a floating point value.
                                                                 //Handles certain forms of scientific notation.
+void logError(String);                                          //Stores error to VDSv2Errors.dat.
 /*********************END FUNCTION PROTOTYPES*********************/
 
 
@@ -187,12 +190,9 @@ void loop(void) {
 	if (Serial.available() > 0) {
 		switch (Serial.read()) {
 		case 'B':
-			Serial.println("Case B;");
-			//testNAN();
-			
+			Serial.println("Bno055 Calibration;");
       eatYourBreakfast();                                       //Flushes serial port
-			test();
-      eatYourBreakfast();                                       //Flushes serial port
+      calibrateBNO();
 			break;
 		case 'A':                                                   //Tests accelerometer
 			Serial.println("Accelerometer test;");
@@ -205,17 +205,41 @@ void loop(void) {
 				// - VECTOR_EULER         - degrees
 				// - VECTOR_LINEARACCEL   - m/s^2
 				// - VECTOR_GRAVITY       - m/s^2
-				imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);  //Creates a vector which stores orientation values
+				//imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);        //Creates a vector which stores orientation values.
+        //imu::Vector<3> linear = bno.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL); //Creates a vector which stores linear acceleration values.
+        imu::Vector<3> gravity = bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);      //Creates a vector which stores orientation values.
+
+        /* Display the floating point data */
+        Serial.println("----- Gravity (x,y,z) -----;");
+        Serial.print("(");
+        Serial.print(gravity.x());                                //
+        Serial.print(",");
+        Serial.print(gravity.y());                                //
+        Serial.print(",");
+        Serial.print(gravity.z());                                //
+        Serial.println(");");
+
+
+        /* Displays the current linear acceleration values */
+        /*Serial.println("----- LinearAccel (x,y,z) -----;");
+        Serial.print("(");
+        Serial.print(linear.x());                                //
+        Serial.print(",");
+        Serial.print(linear.y());                                //
+        Serial.print(",");
+        Serial.print(linear.z());                                //
+        Serial.println(");");*/
 
 				/* Display the floating point data */
-				Serial.print("X: ");
+        /*Serial.println("----- Orientation (degrees) -----;");
+				Serial.print("X (Heading): ");
 				Serial.print(euler.x());                                //Heading
-				Serial.print(" Y: ");
+				Serial.print(" Y (Roll): ");
 				Serial.print(euler.y());                                //Roll
-				Serial.print(" Z: ");
+				Serial.print(" Z (Pitch): ");
 				Serial.print(euler.z());                                //Pitch
-				Serial.println("");
-				delay(500);
+				Serial.println(";");*/
+//				delay();
 			}	
 			break;
 		case 'K':                                                   //Tests kalman filter
@@ -230,6 +254,7 @@ void loop(void) {
 			eatYourBreakfast();                                       //Flushes serial port
 			if ((!bmp180_init || !bno055_init) && !TEST_MODE) {       //If sensors are not initialized, send error, do nothing
 				Serial.println("Cannot enter flight mode. A sensor is not initialized.;");
+        logError("Cannot enter flight mode. A sensor is not initialized.");
 			}
 			else {
 				Serial.println("Entering Flight Mode;");                //If sensors are initialized, begin flight mode
@@ -247,6 +272,7 @@ void loop(void) {
 		default:
 			Serial.println("Unkown code received;");
 			Serial.println(response);
+      logError("Unkown code received");
 			break;
 		}
 		Serial.println("-------Menu---------;");
@@ -272,6 +298,7 @@ Author: Jacob
   /**************************************************************************/
 void newFlight(void) {
   sd.remove("VDSv2FlightData.dat");                             //Removes prior flight data file
+  sd.remove("VDSv2Errors.dat");                                 //Removes prior error file
 
   File data = sd.open("VDSv2FlightData.dat", FILE_WRITE);       //Creates new data file
   if(!data){                                                    //If unable to be initiated, throw error statement.  Do nothing
@@ -282,6 +309,14 @@ void newFlight(void) {
     #else
     data.println("xG(m/s^2), yG(m/s^2), zG(m/s^2), xL(m/s^2), yL(m/s^2), zL(m/s^2), leftVel, rightVel, heading(degrees), roll(degrees), pitch(degrees), t(s), alt(m), vel(m/s), accel(m/s^2), kalman altitude(m), kalman velocity(m/s), kalman acceleration(m/s^2)");
     #endif
+    data.close();                                               //Closes data file after use.
+  }
+
+  data = sd.open("VDSv2Errors.dat", FILE_WRITE);           //Creates new error file
+  if(!data){                                                    //If unable to be initiated, throw error statement.  Do nothing
+    Serial.println("Data file unable to initiated.;"); 
+  } else {                                                      
+    data.println("time(s),error");
     data.close();                                               //Closes data file after use.
   }
 
@@ -346,7 +381,7 @@ rawState->accel = -1 * (rawState->accel);                       //flip around ac
 
 	//get time
 	if ((rawState->time = (float)micros() / 1000000) > 4200000000) {
-		rawState->time = (float)millis() / 1000;                    //Retrieves time from millis() function, stores within rawState
+		rawState->time = (float)millis() / (float)1000;             //Retrieves time from millis() function, stores within rawState
 	}
 	
 	//get raw acceleration	
@@ -374,8 +409,7 @@ Author: Jacob & Ben
 /**************************************************************************/
 float calculateVelocity(struct stateStruct rawState) 	{	//VARIABLES NEEDED FOR CALULATION
   float sumTimes = 0, sumTimes2 = 0, sumAlt = 0, sumAltTimes = 0, leftSide = 0;
-  float rightSide = 0, numer = 0, denom=0, aMax = 0, aMin = 0, rSA = 0, rSB = 0;
-  float velocity;
+  float rightSide = 0, numer = 0, denom=0, velocity;
 
 	//shift new readings into arrays	 
 	for (uint8_t i = BUFF_N; i > 0; i--) {
@@ -460,11 +494,13 @@ float calculateVelocity(struct stateStruct rawState) 	{	//VARIABLES NEEDED FOR C
 	velocity = (leftSide + rightSide);                            //Calculates final velocity value by summing the left and right sides of the equation
   if isnan(velocity) {                                          //logs error if velocity value is given as nan
 	  Serial.println("vel is nan!");
+    logError("vel is nan!");
     velocity = 0;                                               //Sets returned velocity to zero to minimize damage from egregious reading.
   }
   if ((velocity > MAX_EXP_VEL) || (velocity < -10)) {           //logs error if velocity value is egregiously too high or low.
 	  Serial.print("Velocity non-nominal! = ");
 	  Serial.println(velocity);
+    logError("Velocity non-nominal! = ");
 	  velocity = 0;                                               //Sets returned velocity to zero to minimize damage from egregious reading.
   }
   return velocity;
@@ -516,8 +552,6 @@ float altitude_plz(void) {
 		Serial.println(millis());
 #endif
 		pressure_ = pressure_kPa / 100.0F;
-		//*altitude = (bmp.pressureToAltitude(SENSORS_PRESSURE_SEALEVELHPA, pressure_));
-		//rawState->alt = (bmp.pressureToAltitude(SENSORS_PRESSURE_SEALEVELHPA, pressure_));
 
 #if DEBUG_ALPHA
 		Serial.print("RCR_getPressure returned: ");
@@ -584,6 +618,8 @@ float getAcceleration(void) {
   storeInfo(xL);                                                                  //logs most recent x-component of linear acceleration to dataFile.
   storeInfo(yL);                                                                  //logs most recent y-component of linear acceleration to dataFile.
   storeInfo(zL);                                                                  //logs most recent z-component of linear acceleration to dataFile.
+
+  testCalibration();
 
   return verticalAcceleration;                                                    //Returns calculated vertical acceleration.
 }//END getAcceleration();
@@ -667,6 +703,24 @@ void calibrateBNO(void) {
     } else {
       calibrationCount = 0;
     }
+    
+    delay(300);
+  }
+}
+
+
+/**************************************************************************/
+/*!
+@brief  Checks if accelerometer is calibrated, logs error if not.
+Author: Jacob
+*/
+/**************************************************************************/
+void testCalibration(void){
+  uint8_t system, gyro, accel, mag = 0;
+  bno.getCalibration(&system, &gyro, &accel, &mag);
+
+  if(accel < 3){
+    logError("Bno055 is not calibrated");
   }
 }
 
@@ -762,6 +816,7 @@ void kalman(int16_t encPos, struct stateStruct rawState, struct stateStruct* fil
 	}
 	if isnan(u_k) { //caused by velocity being nan //errorlog
 		Serial.println("u_k is nan!");
+    logError("u_k is nan!");
 		u_k = 0;
 	}
 
@@ -878,6 +933,7 @@ void storeInfo(float dataPoint){
     myFile.print(",");
   } else {
     Serial.print("Unable to open VDSv2FlightData.dat;");
+    logError("Unable to open VDSv2FlightData.dat");
   }
     myFile.close();
 }
@@ -919,6 +975,7 @@ void storeStructs(struct stateStruct sensorData, struct stateStruct kalmanData){
     myFile.println("");
   } else {
     Serial.print("Unable to open VDSv2FlightData.dat;");
+    logError("Unable to open VDSv2FlightData.dat");
   }
     myFile.close();
 }
@@ -1000,7 +1057,8 @@ void readFromFile(struct stateStruct* destination){
 
     myFile.close();
   } else {
-    Serial.print("error opening the text file!;");
+    Serial.print("error opening the text file within readFromFile()!;");
+    logError("error opening the text file within readFromFile()!");
   }
 } //END readFromFile();
 
@@ -1038,7 +1096,7 @@ Author: Jacob
 */
 /**************************************************************************/
 float numToFloat(char* number){
-    short index = 0, decimalIndex = 0;
+  short index = 0, decimalIndex = 0;
   boolean decimal = false, e = false, negative = false, one = false;
   float result = 0, temp = 0;
 
@@ -1077,6 +1135,26 @@ float numToFloat(char* number){
 } //END numToFloat();
 
 
+/**************************************************************************/
+/*!
+@brief  Stores error to VDSv2Errors.dat.
+Author: Jacob
+*/
+/**************************************************************************/
+void logError(String error){
+  File myFile = sd.open("VDSv2Errors.dat", FILE_WRITE);
+  float time = (float)millis() / (float)1000;
+  
+  if(myFile) {
+    myFile.printf("%0.6f",time);
+    myFile.print(",");
+    myFile.print(error);
+    myFile.println("");
+  } else {
+    Serial.print("Unable to open VDSv2Errors.dat;");
+  }
+    myFile.close();
+}
 
 
 /*/$$$$$$  /$$   /$$ /$$$$$$       /$$$$$$$$                              /$$     /$$
@@ -1100,14 +1178,15 @@ void handShake() {
 	}
 } //END handShake()
 
-  /**************************************************************************/
-  /*!
-  @brief  Clears the serial buffer.. This
-  is helpful for carriage returns and things of that sort that
-  hang around after you got what you wanted.
-  Author: Ben
-  */
-  /**************************************************************************/
+
+/**************************************************************************/
+/*!
+@brief  Clears the serial buffer.. This
+is helpful for carriage returns and things of that sort that
+hang around after you got what you wanted.
+Author: Ben
+*/
+/**************************************************************************/
 void eatYourBreakfast() {
 	while (Serial.available() > 0) {
 		delay(2);
