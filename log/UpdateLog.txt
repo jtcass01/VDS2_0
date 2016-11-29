@@ -102,4 +102,13 @@ with Ben Stringer and Denny Joy.  We are confident we will be prepared for our f
 where we will test our functional methods which retrieve data from sensors and other nonfunctional methods formulate new data from
 previously retrieved data points.  The important methods to test are: calculateVelocity(), getAcceleration(), and kalman() functions.
 These are the most heavily math intensive equations and are new to the VDS since prior test launches over the summer.
-  - Jacob Tyalor Cassady
+  - Jacob Taylor Cassady
+
+Entry 1 - 11/28/2016:
+  Updated comments for a majority of the program.  Also determined orientation of linear acceleration and acceleration of gravity
+vectors.  This was needed to be done after having continuous issues with values receieved from getAcceleration().  Updates will need to
+be made to the AccelerationProof image within the ReferenceImages folder.  Additionally, please see ReferenceImages folder for diagram
+of orientations.  Please note that the gravity vectors are considered as the gravity acting on that location.  For instance if the 
+arrow is pointing towards the top of the sensor and is blue, the gravity vector displays a positive value (z=9.8ish) when the sensor is 
+flat.
+  - Jacob Taylor Cassady
