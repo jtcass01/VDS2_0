@@ -3,38 +3,38 @@
 #include <Wire.h>
 #include <math.h>
 
-#include "hashTagDefines.h"		//All the VDS settings and constants are here
-#include "RCR_Bmp180.h"			//Our own version of the pressure sensor library
+#include "hashTagDefines.h"		                                  //All the VDS settings and constants are here
+#include "RCR_Bmp180.h"			                                    //Our own version of the pressure sensor library
 #include "MatrixMath.h"
 #include <SdFat.h>
 #include <SPI.h>
 
 struct stateStruct {
-	float alt;
-	float vel;
-	float accel;
-	float time;
-	float buff_t;				//The time relative to the present moment. (used in calculateVelocity())
+	float alt;                                                    //The most recent altitude reading from Adafruit BMP180 sensor           (m)
+	float vel;                                                    //The most recent velocity derived from calculateVelocity() function     (m/s)
+	float accel;                                                  //The most recent acceleration reading from Adafruit BNO055 sensor       (m/s^2)
+	float time;                                                   //Time since the program began                                           (s)
+	float buff_t;				                                          //The time relative to the present moment. (used in calculateVelocity()) (s)
 };
 
 /********************BEGIN GLOBAL VARIABLES********************/
 /*General Variables*/
-struct stateStruct pastRawStates[BUFF_N];
-unsigned long timer = 0;
+struct stateStruct pastRawStates[BUFF_N];                       //Stores past BUFF_N state structures
+unsigned long timer = 0;                  
 unsigned int stopWatch = 0;
 
 /*BMP180 Variables*/
-long padAlt;								//The sea level (SL) altitude of the launchpad. (mm)
-bool bmp180_init = false;					//used to inform user that the bmp180 was not initialized succesfully
+long padAlt;								                                    //The sea level (SL) altitude of the launchpad. (mm)
+bool bmp180_init = false;					                              //used to inform user that the bmp180 was not initialized succesfully
 
 /*BNO055 Variables*/
-bool bno055_init = false;					//used to inform user that the bno055 was not initialized succesfully
+bool bno055_init = false;					                              //used to inform user that the bno055 was not initialized succesfully
 
 /*GUI Variables*/
-char response;								//Holds the most recent char response from Serial
+char response;								                                  //Holds the most recent char response from Serial
 
 /*Kalman variables*/
-float q_k[3][3] = {
+float q_k[3][3] = {                                             //Constants used in Kalman calculations
 	{ 1, 0, 0 },
 	{ 0, 0.02, 0 },
 	{ 0, 0, 0.2 }
@@ -46,66 +46,65 @@ float r_k[3][3] = {
 };
 
 //encoder
-volatile uint8_t encPos = 0;
+volatile uint8_t encPos = 0;                                    //Stores most recent position of encoder
 
 /*********************END GLOBAL VARIABLES*********************/
 
 //tests for the kalman filter...
-struct stateStruct filteredState_test;
+struct stateStruct filteredState_test;                          //Structures used in kalman filter tests
 struct stateStruct z_k_1;
 struct stateStruct z_k_2;
 struct stateStruct z_k_3;
 
 /********************CREATE BMP180 OBJECTS********************/
-Adafruit_BMP085_Unified bmp = Adafruit_BMP085_Unified(10085);
+Adafruit_BMP085_Unified bmp = Adafruit_BMP085_Unified(10085);   //stores BMP180 object
 /*********************END BMP180 OBJECTS*********************/
 
 /********************CREATE BMP180 OBJECTS********************/
-#define BNO055_SAMPLERATE_DELAY_MS (100)
-Adafruit_BNO055 bno = Adafruit_BNO055();
+Adafruit_BNO055 bno = Adafruit_BNO055();                        //stores BNO055 object
 /*********************END BMP180 OBJECTS*********************/
 
 /********************CREATE FILE IO OBJECTS********************/
-File data;                                          //Stores file object
-SdFatSdio sd;                                       //Micro SD card object
+File data;                                                      //Stores file object
+SdFatSdio sd;                                                   //Micro SD card object
 /**********************END FILE IO OBJECTS*********************/
 
 /********************BEGIN FUNCTION PROTOTYPES********************/
 /*General Functions*/
-void newFlight(void);                               //Initiates files and variables for a new flight
-void initializePastStates(void);                    //Initializes the pastRawStates array to states with 0 values
-void flightMode(void);                              //Begins flightMode sequence.  Dependent on TESTMODE
-void getRawState(struct stateStruct* rawState);     //Retrieves data from sensors.
-float calulateVelocity(struct stateStruct);         //Calculates velocity using alt from bmp180 and accel from BNO055
+void newFlight(void);                                           //Initiates files and variables for a new flight
+void initializePastStates(void);                                //Initializes the pastRawStates array to states with 0 values
+void flightMode(void);                                          //Begins flightMode sequence.  Dependent on TESTMODE
+void getRawState(struct stateStruct* rawState);                 //Retrieves data from sensors.
+float calulateVelocity(struct stateStruct);                     //Calculates velocity using alt from bmp180 and accel from BNO055
 void copyState(struct stateStruct* original, struct stateStruct* destination);  //Deep copies one state to another
-void printPastStates(struct stateStruct*);          //Prints all pastRawState values.
-void printState(struct stateStruct, int);           //Prints one state and it's location in the pastRawStates array
+void printPastStates(struct stateStruct*);                      //Prints all pastRawState values.
+void printState(struct stateStruct, int);                       //Prints one state and it's location in the pastRawStates array
 
 /*GUI Functions*/
-void handShake(void);                               //Initiates pairing with Java program
-void returnResponse(char);                          //Returns received response from Java program with message stating what was received.
+void handShake(void);                                           //Initiates pairing with Java program
+void returnResponse(char);                                      //Returns received response from Java program with message stating what was received.
 
 /*BMP180 Functions*/
-bool altitude_plz(float*);                          //Checks if Bmp180 has a reading ready, retrieves reading and requests a new readings
-                                                    //if yes, returns false if not ready yet
+bool altitude_plz(float*);                                      //Checks if Bmp180 has a reading ready, retrieves reading and requests a new readings
+                                                                //if yes, returns false if not ready yet
 
-long getPadAlt(void);                               //Finds pad altitude using bmp180 sensor
+long getPadAlt(void);                                           //Finds pad altitude using bmp180 sensor
 
 /*BNO055 Functions*/
-float getAcceleration(void);                        //Returns the vertical acceleration as a floating point value
-void calibrateBNO(void);                            //Enters program into a calibration mode, requiring the BNO's acceleration calibration
-                                                    //value to reach 3 before exiting.
+float getAcceleration(void);                                    //Returns the vertical acceleration as a floating point value
+void calibrateBNO(void);                                        //Enters program into a calibration mode, requiring the BNO's acceleration calibration
+                                                                //value to reach 3 before exiting.
 /*Kalman Functions*/
-void kalman(int16_t, struct stateStruct, struct stateStruct*);    //Filters the state of the vehicle
+void kalman(int16_t, struct stateStruct, struct stateStruct*);  //Filters the state of the vehicle
 
 /*File IO Functions*/
-void storeInfo(float);                              //Stores one data point, followed by a comma, to VDSv2FlightData.dat
-void storeStructs(struct stateStruct, struct stateStruct); //Stores all information from both structs to VDSv2FlightData.dat and ends the line.
-void readFromFile(struct stateStruct* destination);        //Retrieves past flight data for tests.  Replaces sensor functions
-void resetNumber(char*);                            //Resets (char)number array to NULL values.
-float charToFloat(char);                            //Converts a char number to a floating point value
-float numToFloat(char*);                            //Converts a char array representing a number into a floating point value.
-                                                    //Handles certain forms of scientific notation.
+void storeInfo(float);                                          //Stores one data point, followed by a comma, to VDSv2FlightData.dat
+void storeStructs(struct stateStruct, struct stateStruct);      //Stores all information from both structs to VDSv2FlightData.dat and ends the line.
+void readFromFile(struct stateStruct* destination);             //Retrieves past flight data for tests.  Replaces sensor functions
+void resetNumber(char*);                                        //Resets (char)number array to NULL values.
+float charToFloat(char);                                        //Converts a char number to a floating point value
+float numToFloat(char*);                                        //Converts a char array representing a number into a floating point value.
+                                                                //Handles certain forms of scientific notation.
 /*********************END FUNCTION PROTOTYPES*********************/
 
 
@@ -136,10 +135,10 @@ void setup(void) {
 	printTitle();
 	
 	//Confirm connection with Java program
-	//handShake();  // send a byte to establish contact until receiver responds
+	//handShake();                                                // send a byte to establish contact until receiver responds
 
 	/********************INITIALIZE BMP180********************/
-	if (!bmp.begin()) {
+	if (!bmp.begin()) {                                           //Determine if BMP180 is initialized and ready to be used
 		Serial.println("NO Bmp180 DETECTED!");
 	} else {
 		bmp180_init = true;
@@ -148,7 +147,7 @@ void setup(void) {
 	/********************END INITIALIZE BMP180********************/
 
 	/********************INITIALIZE BNO055********************/
-	if (!bno.begin()) {
+	if (!bno.begin()) {                                           //Determine if BNO055 is initialized and ready to be used
 		Serial.println("NO Bno055 DETECTED!");
 	} else {
 		bno055_init = true;
@@ -158,12 +157,12 @@ void setup(void) {
 	/********************END INITIALIZE BNO055********************/
 
 	/********************INITIALIZE SD CARD********************/
-	  if(!sd.begin()){
+	  if(!sd.begin()){                                            //Determine if microSD card is initialized and ready to be used.
 		Serial.println("No SD card DETECTED!");
 	  }
 	  else {
 		  Serial.println("SD card Initialized");
-		  newFlight();
+		  newFlight();                                              //If microSD card id ready, begin initialization of flight.  Includes creation of dataFile and it's heading
 	  }
 	  /********************END INITIALIZE SD CARD********************/
   	
@@ -172,7 +171,7 @@ void setup(void) {
 #endif
 
 	Serial.println("-------Menu-------");
-}
+}  // END setup()
 /********************END SETUP FUNCTION********************/
 
 
@@ -191,13 +190,13 @@ void loop(void) {
 			Serial.println("Case B;");
 			//testNAN();
 			
-			eatYourBreakfast();
+      eatYourBreakfast();                                       //Flushes serial port
 			test();
-			eatYourBreakfast();
+      eatYourBreakfast();                                       //Flushes serial port
 			break;
-		case 'a':
+		case 'A':                                                   //Tests accelerometer
 			Serial.println("Accelerometer test;");
-			eatYourBreakfast();
+      eatYourBreakfast();                                       //Flushes serial port
 			while (Serial.available() == 0) {
 				// Possible vector values can be:
 				// - VECTOR_ACCELEROMETER - m/s^2
@@ -206,33 +205,34 @@ void loop(void) {
 				// - VECTOR_EULER         - degrees
 				// - VECTOR_LINEARACCEL   - m/s^2
 				// - VECTOR_GRAVITY       - m/s^2
-				imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
+				imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);  //Creates a vector which stores orientation values
 
 				/* Display the floating point data */
 				Serial.print("X: ");
-				Serial.print(euler.x());
+				Serial.print(euler.x());                                //Heading
 				Serial.print(" Y: ");
-				Serial.print(euler.y());
+				Serial.print(euler.y());                                //Roll
 				Serial.print(" Z: ");
-				Serial.print(euler.z());
+				Serial.print(euler.z());                                //Pitch
 				Serial.println("");
 				delay(500);
 			}	
 			break;
-		case 'k':
+		case 'K':                                                   //Tests kalman filter
 			Serial.println("kalmaning;");
 			quick_kalman_test();
-			eatYourBreakfast();
+      eatYourBreakfast();                                       //Flushes serial port
 			break;
 		case 'S':
+      eatYourBreakfast();                                       //Flushes serial port
 			break;
-		case 'F':
-			eatYourBreakfast();
-			if ((!bmp180_init || !bno055_init) && !TEST_MODE) {
+		case 'F':                                                   //ENTER FLIGHT MODE
+			eatYourBreakfast();                                       //Flushes serial port
+			if ((!bmp180_init || !bno055_init) && !TEST_MODE) {       //If sensors are not initialized, send error, do nothing
 				Serial.println("Cannot enter flight mode. A sensor is not initialized.;");
 			}
 			else {
-				Serial.println("Entering Flight Mode;");
+				Serial.println("Entering Flight Mode;");                //If sensors are initialized, begin flight mode
 				#if !TEST_MODE  //zero the pad altitude
 					padAlt = altitude_plz();
 					delay(30);
@@ -251,7 +251,7 @@ void loop(void) {
 		}
 		Serial.println("-------Menu---------;");
 	}
-}
+} // END loop()
 /*********************END LOOP FUNCTION*********************/
 
 
@@ -267,34 +267,32 @@ void loop(void) {
 /**************************************************************************/
 /*!
 @brief  Prepares varaibles for new launch
-Author: Jake
+Author: Jacob
 */
   /**************************************************************************/
 void newFlight(void) {
-  sd.remove("VDSv2FlightData.dat");
+  sd.remove("VDSv2FlightData.dat");                             //Removes prior flight data file
 
-  File data = sd.open("VDSv2FlightData.dat", FILE_WRITE);
-  if(!data){
+  File data = sd.open("VDSv2FlightData.dat", FILE_WRITE);       //Creates new data file
+  if(!data){                                                    //If unable to be initiated, throw error statement.  Do nothing
     Serial.println("Data file unable to initiated.;"); 
-  } else {
-    #if TEST_MODE
+  } else {                                                      
+    #if TEST_MODE                                               //Adds unique header depending on if VDS is in test or flight mode
     data.println("leftVel, rightVel, t(s), alt(m), vel(m/s), accel(m/s^2), kalman altitude(m), kalman velocity(m/s), kalman acceleration(m/s^2)");
     #else
     data.println("xG(m/s^2), yG(m/s^2), zG(m/s^2), xL(m/s^2), yL(m/s^2), zL(m/s^2), leftVel, rightVel, heading(degrees), roll(degrees), pitch(degrees), t(s), alt(m), vel(m/s), accel(m/s^2), kalman altitude(m), kalman velocity(m/s), kalman acceleration(m/s^2)");
     #endif
-    data.close();
+    data.close();                                               //Closes data file after use.
   }
 
   initializePastStates();
-  
-  //  padAlt = getPadAlt(); //change
-} //END newFlight()
+} // END newFlight()
 
 
 /**************************************************************************/
 /*!
 @brief  Initializes the pastRawStates array to states with 0 values.
-Author: Jake
+Author: Jacob
 */
 /**************************************************************************/
 void initializePastStates(void){
@@ -302,7 +300,7 @@ void initializePastStates(void){
     pastRawStates[i].alt = (float)(0);
     pastRawStates[i].vel = (float)(0);
     pastRawStates[i].accel = (float)(0);
-    pastRawStates[i].time = 0;
+    pastRawStates[i].time = (float)(0);
   }
 }
 
@@ -310,7 +308,7 @@ void initializePastStates(void){
 /**************************************************************************/
 /*!
 @brief  Launch and test sequence.
-Author: Jake & Ben
+Author: Jacob & Ben
 */
 /**************************************************************************/
 void flightMode(void) {
@@ -319,59 +317,58 @@ void flightMode(void) {
 	while (Serial.available() == 0){
 
 		//get the state, filter it, record it		
-		getRawState(&rawState);		
-		kalman(encPos, rawState, &filteredState);
-		storeStructs(rawState, filteredState);
+		getRawState(&rawState);		                                  //Retrieves raw state from sensors and velocity equation.
+		kalman(encPos, rawState, &filteredState);                   //feeds raw state into kalman filter and retrieves new filtered state.
+		storeStructs(rawState, filteredState);                      //Stores both filtered and raw states into data file.  (Also stores orientation information)
 
 		#if DEBUG_FLIGHTMODE
-		printState(rawState, "raw state");
-		printState(filteredState, "filtered state");
+		printState(rawState, "raw state");                          //If in DEBUG_FLIGHTMODE mode, prints raw state data for evaluation.
+		printState(filteredState, "filtered state");                //If in DEBUG_FLIGHTMODE mode, prints filtered state data for evaluation.
 		#endif
 	}
 	//if some serial input ~= to the standdown code or 1 second passes, call flightmode again...  need to discuss
-} //END flightMode(void)
+} // END flightMode()
 
 
   /**************************************************************************/
   /*!
   @brief  Gathers data from the desired source (Sensors or file).  Dependent on TEST_MODE
-  Author: Jake & Ben
+  Author: Jacob & Ben
   */
   /**************************************************************************/
 void getRawState(struct stateStruct* rawState) {
-//static struct stateStruct rawState; //needs to be static because of the altitude reading (ask Ben)
-#if TEST_MODE
-//testMode code
-readFromFile(rawState);
-rawState->accel = -1 * (rawState->accel); //flip around acceleration
-rawState->time = (rawState->time) + 500;  //test for rounding error at later times
+#if TEST_MODE                                                   //If file is in test mode, retrieve sensor data from data file with past flight data
+readFromFile(rawState);                                         //Stores past flight information from data file into rawState struct.
+rawState->accel = -1 * (rawState->accel);                       //flip around acceleration, as prior flight data considers upwards acceleration to be negative
 #else
 	//get raw altitude
-	rawState->alt = altitude_plz() - padAlt;
+	rawState->alt = altitude_plz() - padAlt;                      //Retrieves altitude from bmp180 sensor, stores within rawState
 
 	//get time
-	rawState->time = (float)micros() / 1000000;
+	if ((rawState->time = (float)micros() / 1000000) > 4200000000) {
+		rawState->time = (float)millis() / 1000;                    //Retrieves time from millis() function, stores within rawState
+	}
 	
 	//get raw acceleration	
-	rawState->accel = getAcceleration_2();
+	rawState->accel = getAcceleration_2();                        //Retrieves acceleration from bno055 sensor, stores within rawState
 
 #endif
 
 	//calculate velocity
-	rawState->vel = calculateVelocity(*rawState);
+	rawState->vel = calculateVelocity(*rawState);                 //Calculates velocity using algorithm.  Takes prior acceleration and velocity values from pastRawStates
 
 #if DEBUG_RAWSTATE
 	Serial.println();
 	Serial.println("RAW STATE--------------------");
-	printState(*rawState, "rawState");
+  printState(rawState, "raw state");                            //If in DEBUG_RAWSTATE mode, prints raw state data for evaluation.
 #endif
-}
+} // END getRawState()
 
 
 /**************************************************************************/
 /*!
 @brief  Calculates a velocity value using altitude data from BMP180 and acceleration data fromm BNO055.
-Author: Jake & Ben
+Author: Jacob & Ben
 - Algorithm developed by Ben Stringer, function written by Jacob Cassady
 */
 /**************************************************************************/
@@ -382,24 +379,24 @@ float calculateVelocity(struct stateStruct rawState) 	{	//VARIABLES NEEDED FOR C
 
 	//shift new readings into arrays	 
 	for (uint8_t i = BUFF_N; i > 0; i--) {
-    copyState(&pastRawStates[i],&pastRawStates[i-1]);
+    copyState(&pastRawStates[i],&pastRawStates[i-1]);           //copyState(1,2) deep copies information from struct 1 into struct 2.
 	}
-	rawState.buff_t = 0;
-	copyState(&pastRawStates[0], &rawState);
+	rawState.buff_t = 0;                              
+	copyState(&pastRawStates[0], &rawState);                      //Moves newest state into the 0 position of pastRawStates array.
 
 	//time relative to the current moment
 	for (uint8_t i = BUFF_N; i > 0; i--) {
-		pastRawStates[i - 1].buff_t = pastRawStates[i - 1].time - rawState.time;
+		pastRawStates[i - 1].buff_t = pastRawStates[i - 1].time - rawState.time;   //Calculates buff_t values for pastRawStates array
 	}
 
-	#if DEBUG_VELOCITY && DEBUG_DELTA
+	#if DEBUG_VELOCITY && DEBUG_EMERGENCY
 		Serial.println("");
 		Serial.println("Past states post-shift");
-		printPastStates(pastRawStates);
+		printPastStates(pastRawStates);                             //If in DEBUG_VELOCITY and DEBUG_EMERGENCY, print all pastRawStates for verification of function output
 	#endif
 
 	//FIND SUMS FOR BMP
-	for (unsigned int i = 0; i < BUFF_N; i++) {
+	for (unsigned int i = 0; i < BUFF_N; i++) {                   //Calculates sums for left side of velocity equation.
 		sumTimes += (float)(pastRawStates[i].buff_t) ;
 		sumTimes2 += (float)((pastRawStates[i].buff_t) * (pastRawStates[i].buff_t));
 		sumAlt += pastRawStates[i].alt;
@@ -411,51 +408,24 @@ float calculateVelocity(struct stateStruct rawState) 	{	//VARIABLES NEEDED FOR C
 	denom = ((sumTimes*sumTimes) - (BUFF_N * sumTimes2));
 	leftSide = numer / denom;
 
-  storeInfo(leftSide);
-  storeInfo(rightSide);
+  storeInfo(leftSide);                                          //Stores leftSide values for further post-flight analysis.
+  storeInfo(rightSide);                                         //Stores rightSide values for further post-flight analysis.
+
+  #if DEBUG_VELOCITY && DEBUG_EMERGENCY                         //Prints header for future rightSide values if in DEBUG_VELOCITY && DEBUG_EMERGENCY modes.
+  Serial.println(" ----- rightSide values ----- ");
+  #endif
 
 	//CALCULATE RIGHT SIDE OF EQUATION
-	#if DEBUG_VELOCITY && DEBUG_EMERGENCY
-	Serial.println("");
-	Serial.println("Rightside: ");
-	#endif
-
-	//rightSide += 0.5 * (pastRawStates[0].accel - pastRawStates[1].accel) * (pastRawStates[0].buff_t - pastRawStates[1].buff_t);
-	//rightSide += 0.5 * (pastRawStates[BUFF_N / 2 - 1].accel - pastRawStates[BUFF_N / 2].accel) * (pastRawStates[BUFF_N / 2 - 1].buff_t - pastRawStates[BUFF_N / 2].buff_t);
 	for (unsigned int i = 0; i <= (BUFF_N / 2 ); i++) {
 		rightSide += 0.5 * (pastRawStates[i].accel + pastRawStates[i + 1].accel) * (pastRawStates[i].buff_t - pastRawStates[i + 1].buff_t);
-		#if DEBUG_VELOCITY && DEBUG_EMERGENCY
+		#if DEBUG_VELOCITY && DEBUG_EMERGENCY                       //Reports rightSide values if in DEBUG_VELOCITY && DEBUG_EMERGENCY modes, final value is used for final velocity calculation.
 		Serial.print(i);
 		Serial.print(") rightSide = ");
 		Serial.println(rightSide,6);
 		#endif
 	}
 
-
-	/*for (unsigned int i = 0; i < (BUFF_N/2); i++) {
-    if(pastRawStates[i].accel > pastRawStates[i + 1].accel){
-      aMax = pastRawStates[i].accel; 
-      aMin = pastRawStates[i + 1].accel;
-    } else if (pastRawStates[i].accel == pastRawStates[i + 1].accel){
-      aMin = pastRawStates[i].accel; 
-      aMax = pastRawStates[i + 1].accel;      
-    } else {
-      aMin = pastRawStates[i].accel; 
-      aMax = pastRawStates[i + 1].accel;      
-    }
-
-    if (aMax <= 0 ){
-      rSA = aMax - aMin;
-      rSB = aMax;
-    } else if (aMin >0){
-      rSA = aMax-aMin;
-      rSB = aMin;
-    } ///TO DO ELSE
-
-    rightSide = (.5*(rSA)*((pastRawStates[i].time) - (pastRawStates[i+1].time))) + (aMax * (pastRawStates[i].time) - (pastRawStates[i+1].time));
-	}*/
-
-#if DEBUG_VELOCITY
+#if DEBUG_VELOCITY                                              //Reports velocity equation pieces for debugging if in DEBUG_VELOCITY mode.
 	Serial.println();
 	Serial.println("VELOCITY--------------------;");
 	Serial.print("leftSide: ");
@@ -487,16 +457,15 @@ float calculateVelocity(struct stateStruct rawState) 	{	//VARIABLES NEEDED FOR C
   Serial.println(";");
 #endif
 
-	velocity = (leftSide + rightSide);
-  if isnan(velocity) {//errorlog
+	velocity = (leftSide + rightSide);                            //Calculates final velocity value by summing the left and right sides of the equation
+  if isnan(velocity) {                                          //logs error if velocity value is given as nan
 	  Serial.println("vel is nan!");
-	  velocity = 0;
+    velocity = 0;                                               //Sets returned velocity to zero to minimize damage from egregious reading.
   }
-  if ((velocity > MAX_EXP_VEL) || (velocity < -10)) { //errorlog
+  if ((velocity > MAX_EXP_VEL) || (velocity < -10)) {           //logs error if velocity value is egregiously too high or low.
 	  Serial.print("Velocity non-nominal! = ");
 	  Serial.println(velocity);
-	  velocity = 0;
-	  //delay(5000); //TEMPORARY
+	  velocity = 0;                                               //Sets returned velocity to zero to minimize damage from egregious reading.
   }
   return velocity;
 }// END calculateVelocity()
@@ -505,7 +474,7 @@ float calculateVelocity(struct stateStruct rawState) 	{	//VARIABLES NEEDED FOR C
 /**************************************************************************/
 /*!
 @brief  Deep copies one state to another
-Author: Jake
+Author: Jacob
 */
 /**************************************************************************/
 void copyState(struct stateStruct* destination, struct stateStruct* original){
@@ -514,7 +483,7 @@ void copyState(struct stateStruct* destination, struct stateStruct* original){
   destination->accel = original->accel;
   destination->time = original->time;
   destination->buff_t = original->buff_t;
-}
+} // END copyState()
 
 
 
@@ -539,7 +508,7 @@ float altitude_plz(void) {
 	float pressure_; //units are Pa*10?
 
 	if (bmp.RCR_readyYet()) {
-		bmp.RCR_getPressure(&pressure_kPa);  //picks up the pressure reading from the Bmp180, then puts in a request for a new one
+		bmp.RCR_getPressure(&pressure_kPa);                         //picks up the pressure reading from the Bmp180, then puts in a request for a new one
 #if DEBUG_ALPHA
 		Serial.print("RCR_getPressure returned: ");
 		Serial.print(pressure_kPa);
@@ -559,8 +528,7 @@ float altitude_plz(void) {
 		Serial.println(rawState->alt);
 #endif
 		returnVal = bmp.pressureToAltitude(SENSORS_PRESSURE_SEALEVELHPA, pressure_);
-		//return true;
-	}//else return false
+	}
 	return returnVal;
 }
 
@@ -574,56 +542,56 @@ float altitude_plz(void) {
 /**************************************************************************/
 /*!
 @brief  Returns the vertical acceleration as a floating point value
-Author: Jake
+Author: Jacob
 */
 /**************************************************************************/
 float getAcceleration(void) {
-  imu::Vector<3> gravity = bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
-  imu::Vector<3> linear = bno.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
+  imu::Vector<3> gravity = bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);        //Creates vector to store acceleration from gravity components
+  imu::Vector<3> linear = bno.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);     //Creates vector to store linear acceleration components
   float linearDotGravity = 0, theta = 0, defOfProduct = 0, magOfVerticalAcceleration = 0, verticalAcceleration = 0, magL = 0, magG = 0;
   float xG=0, yG=0, zG=0, xL=0, yL=0, zL=0;
 
-  xG = (float)gravity.x();
-  yG = (float)gravity.y();
-  zG = (float)gravity.z();
+  xG = (float)gravity.x();                                                        //Stores most recent x-component of acceleration by gravity
+  yG = (float)gravity.y();                                                        //Stores most recent y-component of acceleration by gravity
+  zG = (float)gravity.z();                                                        //Stores most recent z-component of acceleration by gravity
 
-  xL = (float)linear.x();
-  yL = (float)linear.y();
-  zL = (float)linear.z();
+  xL = (float)linear.x();                                                         //Stores most recent x-component of linear acceleration
+  yL = (float)linear.y();                                                         //Stores most recent y-component of linear acceleration
+  zL = (float)linear.z();                                                         //Stores most recent z-component of linear acceleration
   
-  linearDotGravity = (xG*xL)+(yG*yL)+(zG*zL);
+  linearDotGravity = (xG*xL)+(yG*yL)+(zG*zL);                                     //Calculates dot product of linear acceleration and acceleration from gravity vectors
 
-  magL = pow(((xL*xL)+(yL*yL)+(zL*zL)),0.5);
-  magG = pow(((xG*xG)+(yG*yG)+(zG*zG)),.5);
+  magL = pow(((xL*xL)+(yL*yL)+(zL*zL)),0.5);                                      //Calculates magnitude of linear acceleration vector.
+  magG = pow(((xG*xG)+(yG*yG)+(zG*zG)),.5);                                       //Calculates magnitude of acceleration from gravity vector.
 
-  defOfProduct = linearDotGravity / (magL*magG);
+  defOfProduct = linearDotGravity / (magL*magG);                                  //Calculates the cosine value using the definition of a dot product.
 
-  theta = acos(defOfProduct);
-  theta = (theta*180)/PI;
+  theta = acos(defOfProduct);                                                     //Calculates theta using the arc cosine of the previously calculated vosine value.
+  theta = (theta*180)/PI;                                                         //Converts theta from radians to degress.
 
-  magOfVerticalAcceleration = linearDotGravity / magG;
+  magOfVerticalAcceleration = linearDotGravity / magG;                            //Finds the magnitude of acceleration in the direction of gravity.
 
-  if(90 < theta || theta < 270){
-    verticalAcceleration = magOfVerticalAcceleration;
+  if(90 < theta || theta < 270){                                                  //Determines the sign of acceleration depending on the size of theta.
+    verticalAcceleration = magOfVerticalAcceleration;                             //If the linear acceleration is going in the opposite direction as gravity, assume acceleration is positive.
   } else {
-    verticalAcceleration = magOfVerticalAcceleration * -1;
+    verticalAcceleration = magOfVerticalAcceleration * -1;                        //If the linear acceleration is going in the same direction as gravity, assume acceleration is negative.
   }
 
-  storeInfo(xG);
-  storeInfo(yG);
-  storeInfo(zG);
+  storeInfo(xG);                                                                  //logs most recent x-component of acceleration by gravity to dataFile.
+  storeInfo(yG);                                                                  //logs most recent y-component of acceleration by gravity to dataFile.
+  storeInfo(zG);                                                                  //logs most recent z-component of acceleration by gravity to dataFile.
 
-  storeInfo(xL);
-  storeInfo(yL);
-  storeInfo(zL);
+  storeInfo(xL);                                                                  //logs most recent x-component of linear acceleration to dataFile.
+  storeInfo(yL);                                                                  //logs most recent y-component of linear acceleration to dataFile.
+  storeInfo(zL);                                                                  //logs most recent z-component of linear acceleration to dataFile.
 
-  return verticalAcceleration;
+  return verticalAcceleration;                                                    //Returns calculated vertical acceleration.
 }//END getAcceleration();
 
  /**************************************************************************/
  /*!
  @brief  Returns the vertical acceleration as a floating point value
- Author: Jake with edits by Ben
+ Author: Jacob with edits by Ben
  */
  /**************************************************************************/
 float getAcceleration_2(void) {
@@ -673,7 +641,7 @@ float getAcceleration_2(void) {
 /*!
 @brief  Enters program into a calibration mode, requiring the BNO's acceleration calibration
         value to reach 3 before exiting.
-Author: Jake
+Author: Jacob
 */
 /**************************************************************************/
 void calibrateBNO(void) {
@@ -899,7 +867,7 @@ void quick_kalman_test(void) {
 /**************************************************************************/
 /*!
 @brief  Stores one data point to VDSv2FlightData.dat
-Author: Jake
+Author: Jacob
 */
 /**************************************************************************/
 void storeInfo(float dataPoint){
@@ -917,7 +885,7 @@ void storeInfo(float dataPoint){
 /**************************************************************************/
 /*!
 @brief  Stores all information from both structs to VDSv2FlightData.dat and ends the line.
-Author: Jake
+Author: Jacob
 */
 /**************************************************************************/
 void storeStructs(struct stateStruct sensorData, struct stateStruct kalmanData){
@@ -959,7 +927,7 @@ void storeStructs(struct stateStruct sensorData, struct stateStruct kalmanData){
 /**************************************************************************/
 /*!
 @brief  Retrieves past flight data for tests.  Replaces sensor functions
-Author: Jake
+Author: Jacob
 */
 /**************************************************************************/
 void readFromFile(struct stateStruct* destination){
@@ -1040,7 +1008,7 @@ void readFromFile(struct stateStruct* destination){
 /**************************************************************************/
 /*!
 @brief  Resets (char)number array to NULL values.
-Author: Jake
+Author: Jacob
 */
 /**************************************************************************/
 void resetNumber(char* number){
@@ -1053,7 +1021,7 @@ void resetNumber(char* number){
 /**************************************************************************/
 /*!
 @brief  Converts a char number to a floating point value
-Author: Jake
+Author: Jacob
 */
 /**************************************************************************/
 float charToFloat(char input){
@@ -1066,7 +1034,7 @@ float charToFloat(char input){
 /*!
 @brief  Converts a char array representing a number into a floating point value.
         Handles certain forms of scientific notation.
-Author: Jake
+Author: Jacob
 */
 /**************************************************************************/
 float numToFloat(char* number){
@@ -1122,7 +1090,7 @@ float numToFloat(char* number){
 /**************************************************************************/
 /*!
 @brief  Initializes and confirms connection with Java program.
-Author: Jake
+Author: Jacob
 */
 /**************************************************************************/
 void handShake() {
@@ -1150,7 +1118,7 @@ void eatYourBreakfast() {
 /**************************************************************************/
 /*!
 @brief  Returns a received response from the Java program to ensure successful delivery
-Author: Jake
+Author: Jacob
 */
 /**************************************************************************/
 void returnResponse(char response) {
@@ -1167,7 +1135,7 @@ void returnResponse(char response) {
   /**************************************************************************/
   /*!
   @brief  Prints one state and it's location in the pastRawStates array
-  Author: Jake
+  Author: Jacob
   */
   /**************************************************************************/
 void printState(struct stateStruct state, int label) {
@@ -1209,7 +1177,7 @@ void printState(struct stateStruct state, String label) {
 /**************************************************************************/
 /*!
 @brief  Prints all pastRawState values.
-Author: Jake
+Author: Jacob
 */
 /**************************************************************************/
 void printPastStates(struct stateStruct* pastStates) {
@@ -1238,7 +1206,7 @@ void printTitle(void) {
 	Serial.println("             River City Rocketry's Variable Drag System");
 	Serial.println(" \t\t December 2016 Sensor/Filter Tests");
 	Serial.println("");
-	Serial.println("Software written by Jake Cassady, Ben Stringer, Lydia Sharp, and Denny Joy.");
+	Serial.println("Software written by Jacob Cassady, Ben Stringer, Lydia Sharp, and Denny Joy.");
 	Serial.println("With help from libraries written by Adafruit Industries.");
 	Serial.println("Mechanical hardware developed by Justin Johnson.");
 	Serial.println("Electrical hardware developed by Kenny Dang and Alora Mazarakis.");
