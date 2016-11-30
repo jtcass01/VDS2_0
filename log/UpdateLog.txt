@@ -112,3 +112,15 @@ of orientations.  Please note that the gravity vectors are considered as the gra
 arrow is pointing towards the top of the sensor and is blue, the gravity vector displays a positive value (z=9.8ish) when the sensor is 
 flat.
   - Jacob Taylor Cassady
+
+Entry 1 - 11/29/2016:
+  Made mass changes to the getAcceleration() function.  After tests yesterday, I was confused as to why the gravity vector had a 
+positive z-component when the sensor was flat on the table.  This led me to believe the gravity vector's values should be mulitplied
+by negative 1.  After some testing today I concluded that the values did not need to be inverted and there was no need to find theta
+as the length portion of the definition of a vector projection provides the upwards or downwards direction.  Consequently, I have 
+removed the theta calculations from the getAcceleration() function but have left the lines within an overloaded form of the function
+which takes two vectors as arguments (gravity, linear) and presents several values through Serial for testing and verification.  
+Additionally, I created a menu for the program which is updated and uniform.  Furthermore, I created additional functions to test many
+sections including the BNO055, BMP180, and Kalman Filter.  To see the whiteboards with my calculations today please see 11-29-2016.jpg
+in the ReferenceImages folder.
+  - Jacob Taylor Cassady
