@@ -246,6 +246,8 @@ Author: Jacob
 */
   /**************************************************************************/
 void systemCheck(void){
+  uint8_t system, gyro, accel, mag = 0;
+
   /********************INITIALIZE OR TEST BMP180********************/
   if (!bmp.begin()) {                                           //Determine if BMP180 is initialized and ready to be used
     Serial.println("NO Bmp180 DETECTED!");
@@ -262,6 +264,18 @@ void systemCheck(void){
     bno055_init = true;
     bno.setExtCrystalUse(true);
     Serial.println("Bno055 Initialized");
+
+    bno.getCalibration(&system, &gyro, &accel, &mag);                             //Retrieves calibration values from sensor.
+    Serial.print("CALIBRATION: Sys=");                                            //Prints calibration values to serial
+    Serial.print(system, DEC);
+    Serial.print(" Gyro=");
+    Serial.print(gyro, DEC);
+    Serial.print(" Accel=");
+    Serial.print(accel, DEC);
+    Serial.print(" Mag=");
+    Serial.print(mag, DEC);
+    Serial.println(";");
+
   }
   /********************END TESTING OF BNO055********************/
 
@@ -371,7 +385,7 @@ rawState->accel = -1 * (rawState->accel);                       //flip around ac
   }
   
   //get raw acceleration  
-  rawState->accel = getAcceleration_2();                        //Retrieves acceleration from bno055 sensor, stores within rawState
+  rawState->accel = getAcceleration();                        //Retrieves acceleration from bno055 sensor, stores within rawState
 
 #endif
 
@@ -630,7 +644,7 @@ void testAccelerometer(void){
     imu::Vector<3> gravity = bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);      //Creates a vector which stores orientation values.
 
     /* Display the current acceleration from gravity*/
-    Serial.println("----- Gravity (x,y,z) -----;");
+    Serial.print("Initial Gravity <x,y,z>: ");
     Serial.print("<");
     Serial.print(gravity.x());                                //
     Serial.print(",");
@@ -641,7 +655,7 @@ void testAccelerometer(void){
 
 
     /* Displays the current linear acceleration values */
-    Serial.println("----- LinearAccel (x,y,z) -----;");
+    Serial.print("LinearAccel <x,y,z>: ");
     Serial.print("<");
     Serial.print(linear.x());                                //
     Serial.print(",");
@@ -650,9 +664,7 @@ void testAccelerometer(void){
     Serial.print(linear.z());                                //
     Serial.println(">;");
 
-    Serial.print("VERTICAL ACCELERATION = ");
-    Serial.printf("%0.3F",getAcceleration(gravity,linear));
-    Serial.println(";");
+    getAcceleration(gravity,linear);
     
 //        /* Display the orientation data */
 //        /*Serial.println("----- Orientation (degrees) -----;");
@@ -677,12 +689,12 @@ Author: Jacob
 float getAcceleration(void) {
   imu::Vector<3> gravity = bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);        //Creates vector to store acceleration from gravity components
   imu::Vector<3> linear = bno.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);     //Creates vector to store linear acceleration components
-  float linearDotGravity = 0, theta = 0, defOfProduct = 0, magOfVerticalAcceleration = 0, verticalAcceleration = 0, magL = 0, magG = 0;
+  float linearDotGravity = 0, theta = 0, defOfProduct = 0, verticalAcceleration = 0, magL = 0, magG = 0;
   float xG=0, yG=0, zG=0, xL=0, yL=0, zL=0;
 
-  xG = (float)gravity.x() * (float)-1;                                            //Stores most recent x-component of acceleration by gravity
-  yG = (float)gravity.y() * (float)-1;                                            //Stores most recent y-component of acceleration by gravity
-  zG = (float)gravity.z() * (float)-1;                                            //Stores most recent z-component of acceleration by gravity
+  xG = (float)gravity.x();                                                        //Stores most recent x-component of acceleration by gravity
+  yG = (float)gravity.y();                                                        //Stores most recent y-component of acceleration by gravity
+  zG = (float)gravity.z();                                                        //Stores most recent z-component of acceleration by gravity
 
   xL = (float)linear.x();                                                         //Stores most recent x-component of linear acceleration
   yL = (float)linear.y();                                                         //Stores most recent y-component of linear acceleration
@@ -690,21 +702,9 @@ float getAcceleration(void) {
   
   linearDotGravity = (xG*xL)+(yG*yL)+(zG*zL);                                     //Calculates dot product of linear acceleration and acceleration from gravity vectors
 
-  magL = pow(((xL*xL)+(yL*yL)+(zL*zL)),0.5);                                      //Calculates magnitude of linear acceleration vector.
-  magG = pow(((xG*xG)+(yG*yG)+(zG*zG)),.5);                                       //Calculates magnitude of acceleration from gravity vector.
+  magG = pow(((xG*xG)+(yG*yG)+(zG*zG)),0.5);                                       //Calculates magnitude of acceleration from gravity vector.
 
-  defOfProduct = linearDotGravity / (magL*magG);                                  //Calculates the cosine value using the definition of a dot product.
-
-  theta = acos(defOfProduct);                                                     //Calculates theta using the arc cosine of the previously calculated vosine value.
-  theta = (theta*180)/PI;                                                         //Converts theta from radians to degress.
-
-  magOfVerticalAcceleration = linearDotGravity / magG;                            //Finds the magnitude of acceleration in the direction of gravity.
-
-  if(90 < theta || theta < 270){                                                  //Determines the sign of acceleration depending on the size of theta.
-    verticalAcceleration = magOfVerticalAcceleration;                             //If the linear acceleration is going in the opposite direction as gravity, assume acceleration is positive.
-  } else {
-    verticalAcceleration = magOfVerticalAcceleration * -1;                        //If the linear acceleration is going in the same direction as gravity, assume acceleration is negative.
-  }
+  verticalAcceleration = linearDotGravity / magG;                                 //Finds the acceleration in the direction of gravity.
 
   storeInfo(xG);                                                                  //logs most recent x-component of acceleration by gravity to dataFile.
   storeInfo(yG);                                                                  //logs most recent y-component of acceleration by gravity to dataFile.
@@ -720,14 +720,14 @@ float getAcceleration(void) {
 } // END getAcceleration();
 
 
-/*OVERLOADED VERSION.  TAKES IN THE TWO VECTORS AND RETURNS THE VERTICAL ACCELERATION*/
+/*OVERLOADED VERSION.  TAKES IN THE TWO VECTORS AND RETURNS THE VERTICAL ACCELERATION :: USED FOR TESTING PURPOSES*/
 float getAcceleration(imu::Vector<3> gravity, imu::Vector<3> linear) {
   float linearDotGravity = 0, theta = 0, defOfProduct = 0, magOfVerticalAcceleration = 0, verticalAcceleration = 0, magL = 0, magG = 0;
   float xG=0, yG=0, zG=0, xL=0, yL=0, zL=0;
 
-  xG = (float)gravity.x() * (float)-1;                                            //Stores most recent x-component of acceleration by gravity
-  yG = (float)gravity.y() * (float)-1;                                            //Stores most recent y-component of acceleration by gravity
-  zG = (float)gravity.z() * (float)-1;                                            //Stores most recent z-component of acceleration by gravity
+  xG = (float)gravity.x();                                                        //Stores most recent x-component of acceleration by gravity
+  yG = (float)gravity.y();                                                        //Stores most recent y-component of acceleration by gravity
+  zG = (float)gravity.z();                                                        //Stores most recent z-component of acceleration by gravity
 
   xL = (float)linear.x();                                                         //Stores most recent x-component of linear acceleration
   yL = (float)linear.y();                                                         //Stores most recent y-component of linear acceleration
@@ -736,30 +736,34 @@ float getAcceleration(imu::Vector<3> gravity, imu::Vector<3> linear) {
   linearDotGravity = (xG*xL)+(yG*yL)+(zG*zL);                                     //Calculates dot product of linear acceleration and acceleration from gravity vectors
 
   magL = pow(((xL*xL)+(yL*yL)+(zL*zL)),0.5);                                      //Calculates magnitude of linear acceleration vector.
-  magG = pow(((xG*xG)+(yG*yG)+(zG*zG)),.5);                                       //Calculates magnitude of acceleration from gravity vector.
+  magG = pow(((xG*xG)+(yG*yG)+(zG*zG)),0.5);                                      //Calculates magnitude of acceleration from gravity vector.
 
   defOfProduct = linearDotGravity / (magL*magG);                                  //Calculates the cosine value using the definition of a dot product.
 
   theta = acos(defOfProduct);                                                     //Calculates theta using the arc cosine of the previously calculated vosine value.
   theta = (theta*180)/PI;                                                         //Converts theta from radians to degress.
 
-  magOfVerticalAcceleration = linearDotGravity / magG;                            //Finds the magnitude of acceleration in the direction of gravity.
+  verticalAcceleration = linearDotGravity / magG;                                 //Finds the acceleration in the direction of gravity.
 
-  if(90 < theta && theta < 270){                                                  //Determines the sign of acceleration depending on the size of theta.
-    verticalAcceleration = magOfVerticalAcceleration;                             //If the linear acceleration is going in the opposite direction as gravity, assume acceleration is positive.
-  } else {
-    verticalAcceleration = magOfVerticalAcceleration * -1;                        //If the linear acceleration is going in the same direction as gravity, assume acceleration is negative.
-  }
+  /* Display the used acceleration from gravity*/
+  Serial.print("Gravity Used <x,y,z>: ");
+  Serial.print("<");
+  Serial.print(xG);                                //
+  Serial.print(",");
+  Serial.print(yG);                                //
+  Serial.print(",");
+  Serial.print(zG);                                //
+  Serial.println(">;");
 
-  storeInfo(xG);                                                                  //logs most recent x-component of acceleration by gravity to dataFile.
-  storeInfo(yG);                                                                  //logs most recent y-component of acceleration by gravity to dataFile.
-  storeInfo(zG);                                                                  //logs most recent z-component of acceleration by gravity to dataFile.
+  /* Display the calculated theta*/
+  Serial.print("Theta: ");
+  Serial.println(theta);
 
-  storeInfo(xL);                                                                  //logs most recent x-component of linear acceleration to dataFile.
-  storeInfo(yL);                                                                  //logs most recent y-component of linear acceleration to dataFile.
-  storeInfo(zL);                                                                  //logs most recent z-component of linear acceleration to dataFile.
-
-  testCalibration();
+  /* Display the calculated vertical acceleration*/
+  Serial.print("verticalAcceleration: ");
+  Serial.print(verticalAcceleration);
+  
+  Serial.println("");
 
   return verticalAcceleration;                                                    //Returns calculated vertical acceleration.
 } // END getAcceleration();  OVERLOADED VERSION
