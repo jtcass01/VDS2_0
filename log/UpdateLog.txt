@@ -121,6 +121,6 @@ as the length portion of the definition of a vector projection provides the upwa
 removed the theta calculations from the getAcceleration() function but have left the lines within an overloaded form of the function
 which takes two vectors as arguments (gravity, linear) and presents several values through Serial for testing and verification.  
 Additionally, I created a menu for the program which is updated and uniform.  Furthermore, I created additional functions to test many
-sections including the BNO055, BMP180, and Kalman Filter.  To see the whiteboards with my calculations today please see 11-29-2016.jpg
+sections including the BNO055, BMP180, and Kalman Filter.  To see the whiteboards with my calculations today please see 11.29.2016.jpg
 in the ReferenceImages folder.
   - Jacob Taylor Cassady
