@@ -199,6 +199,8 @@ void loop(void) {
     case 'F':
       Serial.println("\n\n----- Entering flight mode -----;");
       eatYourBreakfast();                                       //Flushes serial port
+
+      newFlight();
       
       if ((!bmp180_init || !bno055_init) && !TEST_MODE) {       //If sensors are not initialized, send error, do nothing
         Serial.println("Cannot enter flight mode. A sensor is not initialized.;");
@@ -283,11 +285,11 @@ void systemCheck(void){
   if(!sd.begin()){                                            //Determine if microSD card is initialized and ready to be used.
     Serial.println("No SD card DETECTED!");
   } else {
-    Serial.println("SD card Initialized");
-    newFlight();                                              //If microSD card id ready, begin initialization of flight.  Includes creation of dataFile and it's heading
+    Serial.println("SD card Initialized");                    //If microSD card id ready, begin initialization of flight.  Includes creation of dataFile and it's heading
   }
   /********************END TESTING OF SD CARD********************/
-}
+} // END systemCheck()
+
 
 
 /**************************************************************************/
@@ -380,12 +382,12 @@ rawState->accel = -1 * (rawState->accel);                       //flip around ac
   rawState->alt = altitude_plz() - padAlt;                      //Retrieves altitude from bmp180 sensor, stores within rawState
 
   //get time
-  if ((rawState->time = (float)micros() / 1000000) > 4200000000) {
+  if ((rawState->time = (float)micros() / (float)1000000) > 4200000000) {
     rawState->time = (float)millis() / (float)1000;             //Retrieves time from millis() function, stores within rawState
   }
   
   //get raw acceleration  
-  rawState->accel = getAcceleration();                        //Retrieves acceleration from bno055 sensor, stores within rawState
+  rawState->accel = getAcceleration();                          //Retrieves acceleration from bno055 sensor, stores within rawState
 
 #endif
 
@@ -452,7 +454,7 @@ float calculateVelocity(struct stateStruct rawState)  { //VARIABLES NEEDED FOR C
   //CALCULATE RIGHT SIDE OF EQUATION
   for (unsigned int i = 0; i <= (BUFF_N / 2 ); i++) {
     rightSide += 0.5 * (pastRawStates[i].accel + pastRawStates[i + 1].accel) * (pastRawStates[i].buff_t - pastRawStates[i + 1].buff_t);
-    #if DEBUG_VELOCITY && DEBUG_EMERGENCY                       //Reports rightSide values if in DEBUG_VELOCITY && DEBUG_EMERGENCY modes, final value is used for final velocity calculation.
+    #if DEBUG_VELOCITY //&& DEBUG_EMERGENCY                       //Reports rightSide values if in DEBUG_VELOCITY && DEBUG_EMERGENCY modes, final value is used for final velocity calculation.
     Serial.print(i);
     Serial.print(") rightSide = ");
     Serial.println(rightSide,6);
@@ -704,7 +706,7 @@ float getAcceleration(void) {
 
   magG = pow(((xG*xG)+(yG*yG)+(zG*zG)),0.5);                                       //Calculates magnitude of acceleration from gravity vector.
 
-  verticalAcceleration = linearDotGravity / magG;                                 //Finds the acceleration in the direction of gravity.
+  verticalAcceleration = (linearDotGravity / magG) - 9.81;                                 //Finds the acceleration in the direction of gravity.
 
   storeInfo(xG);                                                                  //logs most recent x-component of acceleration by gravity to dataFile.
   storeInfo(yG);                                                                  //logs most recent y-component of acceleration by gravity to dataFile.
