@@ -1,5 +1,6 @@
 #include "state.h"
 #include "stateTree.h"
+#include "heap.h"
 #include <stdio.h>
 
 #define CAPACITY (16)
@@ -26,7 +27,7 @@ int main(void){
   printf("\nCapacity = %i", pRawStates->capacity);
 
   zeroOutHeap(heap, CAPACITY);
-  heap[0] = 8;
+  getBinaryHeap(heap, CAPACITY);
   if(isNew(heap,1)){
     printf("\n1 is new.");
   } else {
