@@ -1,22 +1,35 @@
+#ifndef __STATE_H
+#define __STATE_H
 
-typedef struct s_state {
+#include <stdlib.h>
+
+struct state {
   unsigned short position;
   float time;
   float alt;
   float vel;
   float accel;
-  struct s_state* leftChild;
-  struct s_state* rightChild;
-} state;
+  struct state* leftChild;
+  struct state* rightChild;
+};
 
-state* createState(int pos){
-  state* pState = malloc(sizeof(state));
-  pState->position = pos;
-  pState->alt = 0;
-  pState->vel = 0;
-  pState->accel = 0;
+
+struct state* createState(int pos){
+  struct state* pState = malloc(sizeof(struct state));
+  if(pState != NULL){
+    pState->position = pos;
+    pState->alt = 0;
+    pState->vel = 0;
+    pState->accel = 0;
+  } else {
+    free(pState);
+  }
+  return pState;
 }
 
-void deleteState(state* pState){
+void deleteState(struct state* pState){
   free(pState);
 }
+
+
+#endif
