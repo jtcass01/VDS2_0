@@ -3,7 +3,7 @@
 #include "heap.h"
 #include <stdio.h>
 
-#define CAPACITY (16)
+#define CAPACITY (100)
 
 int heap[CAPACITY];
 struct stateTree* pRawStates;
@@ -28,14 +28,15 @@ int main(void){
 
   zeroOutHeap(heap, CAPACITY);
   getBinaryHeap(heap, CAPACITY);
-  if(isNew(heap,1)){
+
+  /*if(isNew(heap,1)){
     printf("\n1 is new.");
   } else {
     printf("\n1 is not new.");
-  }
-  hasRight(heap[0], CAPACITY, heap);
-  hasLeft(heap[0], 0, heap);
-  printHeap(heap, CAPACITY);
+  }*/
+  //hasRight(heap, heap[0], CAPACITY);
+  //hasLeft(heap, heap[0], 0);
+  printHeap(heap);
 
 
   deleteStateTree(pRawStates);
