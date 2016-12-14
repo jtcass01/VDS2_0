@@ -7,53 +7,78 @@
 #define CEILING_NEG(X) ((X-(int)(X)) < 0 ? (int)(X-1) : (int)(X))
 #define CEILING(X) ( ((X) > 0) ? CEILING_POS(X) : CEILING_NEG(X) )
 
-short hasLeft(int, int, int*);
-int getLeft(int, int, int*);
-short hasRight(int, int, int*);
-int getRight(int, int, int*);
+void zeroOutHeap(int*,short);
+void getBinaryHeap(int*, short);
+short hasLeft(int*, int, int);
+int getLeft(int*, int, int);
+short hasRight(int*, int, int);
+int getRight(int*, int, int);
 short isNew(int*, int);
+int getNextLower(int*, int, int);
+int getNextUpper(int*, short, int, int);
+int checkRepresentation(int*, short);
 
 
-void getBinaryHeap(int* heap, int capacity){
-  int mid = capacity / 2, i = 1, j=0;
+void zeroOutHeap(int* heap, short size){
+  for(unsigned short i = 0; i <= size; i++){
+    heap[i] = 0;
+  }
+}
+
+
+void getBinaryHeap(int* heap, short capacity){
+  int mid = capacity / 2, i = 1, j=0, nextLower = 0, nextUpper = 0;
+  zeroOutHeap(heap,capacity);
 
   heap[0] = mid;
 
   for(;i<capacity;){
     printf("\n\nNode being tested: %i     j = %i", heap[j], j);
+
+    nextLower = getNextLower(heap, heap[j], j);
+    nextUpper = getNextUpper(heap, capacity, heap[j], j);
+
     if(heap[j] < mid){
-      if(hasLeft(heap[j],0,heap)){
-        printf("\nInserting %i at leftNode.     i = %i     j = %i     heapLocation = %i", getLeft(heap[j],0,heap), i, j, (2*j+1));
-        heap[(2*j+1)] = getLeft(heap[j],0,heap);
+      if(hasLeft(heap, heap[j], nextLower)){
+        printf("\nInserting %i at leftNode.     i = %i     j = %i", getLeft(heap, heap[j], nextLower), i, j);
+        //2*j+1
+        heap[i] = getLeft(heap, heap[j], nextLower);
         i++;
       }
-      if(hasRight(heap[j],mid,heap)){
-        printf("\nInserting %i at rightNode.     i = %i     j = %i     heapLocation = %i", getRight(heap[j],mid,heap), i, j, (2*j+2));
-        heap[(2*j+2)] = getRight(heap[j],mid,heap);
+      if(hasRight(heap, heap[j], nextUpper)){
+        printf("\nInserting %i at rightNode.     i = %i     j = %i", getRight(heap, heap[j], nextUpper), i, j);
+        //2*j+2
+        heap[i] = getRight(heap, heap[j], nextUpper);
         i++;
       }
     } else if (heap[j] > mid){
-      if(hasLeft(heap[j],mid,heap)){
-        printf("\nInserting %i at leftNode.     i = %i     j = %i     heapLocation = %i", getLeft(heap[j],mid,heap), i, j, (2*j+1));
-        heap[(2*j+1)] = getLeft(heap[j],mid,heap);
+      if(hasLeft(heap, heap[j], nextLower)){
+        printf("\nInserting %i at leftNode.     i = %i     j = %i", getLeft(heap, heap[j], nextLower), i, j);
+        heap[i] = getLeft(heap, heap[j], nextLower);
         i++;
       }
-      if(hasRight(heap[j],capacity,heap)){
-        printf("\nInserting %i at rightNode.     i = %i     j = %i     heapLocation = %i", getRight(heap[j],capacity,heap), i, j, (2*j+2));
-        heap[(2*j+2)] = getRight(heap[j],capacity,heap);
+      if(hasRight(heap, heap[j],nextUpper)){
+        printf("\nInserting %i at rightNode.     i = %i     j = %i", getRight(heap, heap[j],nextUpper), i, j);
+        heap[i] = getRight(heap, heap[j],nextUpper);
         i++;
       }
     } else {
-      if(hasLeft(mid,0,heap)){
-        heap[i] = getLeft(mid,0,heap);
+      if(hasLeft(heap, mid, nextLower)){
+        heap[i] = getLeft(heap, mid, nextLower);
         i++;
       }
-      if(hasRight(mid,capacity,heap)){
-        heap[i] = getRight(mid, capacity, heap);
+      if(hasRight(heap, mid, nextUpper)){
+        heap[i] = getRight(heap, mid, nextUpper);
         i++;
       }
     }
     j++;
+  }
+
+  if(checkRepresentation(heap, capacity)){
+    printf("\nRepresentation checked.  All position values are included in binary heap.");
+  } else {
+    printf("\nRepresentation check failed.  Find programming error!");
   }
 
 /*  if(heap[capacity-1] == 0){
@@ -63,7 +88,7 @@ void getBinaryHeap(int* heap, int capacity){
   heap[capacity] = 0;*/
 }
 
-short hasLeft(int current, int min, int* heap){
+short hasLeft(int* heap, int current, int min){
   int possibility = 0;
 
   possibility = (int)((current - min) / 2);
@@ -82,7 +107,7 @@ short hasLeft(int current, int min, int* heap){
   }
 }
 
-int getLeft(int current, int min, int* heap){
+int getLeft(int* heap, int current, int min){
   int possibility = 0;
 
   possibility = (int)((current - min) / 2);
@@ -92,7 +117,7 @@ int getLeft(int current, int min, int* heap){
 }
 
 
-short hasRight(int current, int max, int* heap){
+short hasRight(int* heap, int current, int max){
   double temp = 0;
   int possibility = 0;
 
@@ -124,7 +149,7 @@ short hasRight(int current, int max, int* heap){
   }
 }
 
-int getRight(int current, int max, int* heap){
+int getRight(int* heap, int current, int max){
   double temp = 0;
   int possibility = 0;
 
@@ -150,18 +175,84 @@ short isNew(int* heap, int possibility){
   return 1;
 }
 
-void printHeap(int* heap, short size){
+void printHeap(int* heap){
   printf("\n\n----- PRINTING HEAP ------\n");
   for(unsigned short i = 0; heap[i] != 0; i++){
-    printf("\ni = %i       heap[i] = %i", i, heap[i]);
+    printf("\nheap[%i] = %i", i, heap[i]);
   }
 }
 
-void zeroOutHeap(int* heap, short size){
-  for(unsigned short i = 0; i < size; i++){
-    heap[i] = 0;
+
+int getNextLower(int* heap, int current, int location){
+  int spot = 0;
+
+  printf("\n\ngetNextLower()\nCurrent: %i     Location: %i", heap[location], location);
+
+  spot = location;
+
+  while(spot > 0){
+    spot -= 1;
+    spot /= 2;
+
+    printf("\nNew location being tested: %i      value: %i", spot, heap[spot]);
+
+    if(heap[spot] < current){
+      printf("\nLower being returned: %i\n", heap[spot]);
+      return heap[spot];
+    }
   }
+
+  printf("\nLower being returned: %i\n", 0);
+  return 0;
 }
 
+
+int getNextUpper(int* heap, short capacity, int current, int location){
+  int spot = 0;
+
+  printf("\n\ngetNextUpper()\nCapacity: %i      Current: %i     Location: %i", capacity, heap[location], location);
+
+  spot = location;
+
+  while(spot > 0){
+    spot -= 1;
+    spot /= 2;
+
+    printf("\nNew location: %i      value: %i", spot, heap[spot]);
+
+    if(heap[spot] > current){
+      printf("\nUpper being returned: %i\n", heap[spot]);
+      return heap[spot];
+    }
+  }
+
+  printf("\nUpper being returned: %i\n", capacity);
+  return capacity;
+}
+
+
+int checkRepresentation(int* heap, short capacity){
+  int temp[capacity];
+  unsigned short heap_i = 0;
+
+  for(unsigned short temp_i =1; temp_i <= capacity; temp_i++)
+    temp[temp_i-1] = temp_i;
+
+  for(; heap_i < capacity; ){
+    for(unsigned short heap_j = 0; heap_j < capacity; ){
+      if(heap[heap_i] == temp[heap_j]){
+        heap_i++;
+        break;
+      } else {
+        heap_j++;
+      }
+
+      if(heap_j == (capacity - 1) && heap[heap_j] != temp[heap_j]){
+        return 0;
+      }
+    }
+  }
+  return 1;
+}
 
 #endif
