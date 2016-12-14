@@ -12,18 +12,20 @@ struct stateTree* createStateTree(int);
 void deleteStateTree(struct stateTree*);
 void initializeTree(struct stateTree*);
 void insert(const int, struct stateTree*);
-void insert(const int, struct state*);
+void insertState(const int, struct state*);
 void printTree(struct stateTree*);
-void printTree(struct state*);
+void printBranch(struct state*);
 
 
 struct stateTree* createStateTree(int capacity){
-  struct stateTree* pStateTree = malloc(sizeof(short) + (capacity*sizeof(struct state)));
+  struct stateTree* pStateTree = malloc(sizeof(short) + sizeof(struct state));
   if(pStateTree != NULL){
     pStateTree->capacity = capacity;
-//    initializeTree(pStateTree);
+    initializeTree(pStateTree);
+    return pStateTree;
   } else {
     free(pStateTree);
+    return (struct stateTree*)NULL;
   }
 }
 
@@ -42,21 +44,27 @@ void initializeTree(struct stateTree* pStateTree){
   for(unsigned short binaryHeap_i = 0; binaryHeap_i < pStateTree->capacity; binaryHeap_i++){
     insert(binaryHeap[binaryHeap_i], pStateTree);
   }
+
+  printf("\n\nBinary State Tree initialized... printing tree for confirmation..");
+  printTree(pStateTree);
 }
 
 
 void insert(const int pos, struct stateTree* pStateTree){
-  insert(pos, pStateTree->root);
+  printf("\n\nInserting into binary tree...");
+  insertState(pos, pStateTree->root);
+  printTree(pStateTree);
 }
 
-void insert(const int pos, struct state* pState){
+void insertState(const int pos, struct state* pState){
   if(pState == NULL){
     pState = createState(pos);
   } else if (pos < pState->position){
-    insert(pos, pState->leftChild);
+    insertState(pos, pState->leftChild);
   } else if (pos > pState->position){
-    insert(pos, pState->rightChild);
+    insertState(pos, pState->rightChild);
   }
+  printState(pState);
 }
 
 
@@ -68,10 +76,25 @@ int isEmpty(struct stateTree* pStateTree){
 void printTree(struct stateTree* pStateTree){
   printf("\n\nPRINTING BINARY TREE");
 
-
+  if(isEmpty(pStateTree)){
+    printf("\nTree is empty.");
+  } else {
+    printBranch(pStateTree->root);
+  }
 }
 
 
-void printTree(struct state* pState){
-
+void printBranch(struct state* pState){
+  if(pState != NULL) {
+    printBranch(pState->leftChild);
+    printf("\n\n\n----- Printing Tree Node -----");
+    printf("\nPosition = %i", pState->position);
+    printf("\nTime = %f", pState->time);
+    printf("\nAltitude = %f", pState->alt);
+    printf("\nVelocity = %f", pState->vel);
+    printf("\nAcceleration = %f", pState->accel);
+    printf("\nleftChild = %p", pState->leftChild);
+    printf("\nrightChild = %p", pState->rightChild);
+    printBranch(pState->rightChild);
+  }
 }
