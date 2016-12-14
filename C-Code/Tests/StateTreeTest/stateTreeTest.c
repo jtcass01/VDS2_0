@@ -3,7 +3,7 @@
 #include "heap.h"
 #include <stdio.h>
 
-#define CAPACITY (100)
+#define CAPACITY (16)
 
 int heap[CAPACITY];
 struct stateTree* pRawStates;
@@ -12,7 +12,7 @@ void setup();
 
 int main(void){
   setup();
-  printf("\n----- pTestState Created -----\n");
+/*  printf("\n----- pTestState Created -----\n");
   printf("\nPosition = %i", pTestState->position);
   printf("\nTime = %f", pTestState->time);
   printf("\nAltitude = %f", pTestState->alt);
@@ -20,15 +20,13 @@ int main(void){
   printf("\nAcceleration = %f", pTestState->accel);
   printf("\nleftChild = %p", pTestState->leftChild);
   printf("\nrightChild = %p", pTestState->rightChild);
-  deleteState(pTestState);
-  printf("\n\n----- pTestState Deleted -----\n");
 
   printf("\n----- pRawStates Created -----\n");
   printf("\nCapacity = %i", pRawStates->capacity);
 
   zeroOutHeap(heap, CAPACITY);
   getBinaryHeap(heap, CAPACITY);
-
+*/
   /*if(isNew(heap,1)){
     printf("\n1 is new.");
   } else {
@@ -36,8 +34,19 @@ int main(void){
   }*/
   //hasRight(heap, heap[0], CAPACITY);
   //hasLeft(heap, heap[0], 0);
-  printHeap(heap);
+//  printHeap(heap);
 
+
+  deleteState(pTestState);
+  printf("\n\n----- pTestState Deleted -----\n");
+
+/*  printf("\nPosition = %i", pRawStates->root->position);
+  printf("\nTime = %f", pRawStates->root->time);
+  printf("\nAltitude = %f", pRawStates->root->alt);
+  printf("\nVelocity = %f", pRawStates->root->vel);
+  printf("\nAcceleration = %f", pRawStates->root->accel);
+  printf("\nleftChild = %p", pRawStates->root->leftChild);
+  printf("\nrightChild = %p", pRawStates->root->rightChild);*/
 
   deleteStateTree(pRawStates);
   printf("\n\n----- pRawStates Deleted -----\n");
