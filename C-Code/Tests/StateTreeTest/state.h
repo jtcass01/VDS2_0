@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 struct state {
-  unsigned short position;
+  unsigned short key;
   float time;
   float alt;
   float vel;
@@ -19,11 +19,11 @@ struct state* createState(int);
 void deleteState(struct state*);
 void printState(struct state*);
 
-struct state* createState(int pos){
+struct state* createState(int key){
   struct state* pState = malloc(sizeof(struct state));
-  printf("\n\n-----Creating state with position value: %i-----",pos);
+  printf("\n\n-----Creating state with key value: %i-----",key);
   if(pState != NULL){
-    pState->position = pos;
+    pState->key = key;
     pState->time = 0;
     pState->alt = 0;
     pState->vel = 0;
@@ -42,7 +42,7 @@ void deleteState(struct state* pState){
 
 void printState(struct state* pState){
   printf("\n\n----- Printing State -----");
-  printf("\nPosition = %i", pState->position);
+  printf("\nKey = %i", pState->key);
   printf("\nTime = %i", pState->time);
   printf("\nAltitude = %i", pState->alt);
   printf("\nVelocity = %i", pState->vel);
