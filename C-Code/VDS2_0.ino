@@ -3,7 +3,7 @@
 #include <Wire.h>
 #include <math.h>
 
-#include "hashTagDefines.h"                                      //All the VDS settings and constants are here
+#include "hashTagDefines.h"                                     //All the VDS settings and constants are here
 #include "RCR_Bmp180.h"                                         //Our own version of the pressure sensor library
 #include "MatrixMath.h"
 #include <SdFat.h>
@@ -99,6 +99,7 @@ void calibrateBNO(void);                                        //Menu Function.
                                                                 //value to reach 3 before exiting.
 void testAccelerometer(void);                                   //Menu Function.  Displays different sensor values from the BNO055 as well as the calculated vertical acceleration.
 float getAcceleration(void);                                    //Returns the vertical acceleration as a floating point value.
+float getAcceleration(imu::Vector<3> gravity, imu::Vector<3> linear);//Returns the vertical acceleration as a floating point value. (test)
 void testCalibration(void);                                     //Checks if accelerometer is calibrated, logs error if not.
 
 /*Kalman Functions*/
@@ -299,10 +300,10 @@ Author: Jacob
 */
   /**************************************************************************/
 void newFlight(void) {
-  sd.remove("VDSv2FlightData.dat");                             //Removes prior flight data file
+  sd.remove(DATA_FILENAME);                             //Removes prior flight data file
   sd.remove("VDSv2Errors.dat");                                 //Removes prior error file
 
-  File data = sd.open("VDSv2FlightData.dat", FILE_WRITE);       //Creates new data file
+  File data = sd.open(DATA_FILENAME, FILE_WRITE);       //Creates new data file
   if(!data){                                                    //If unable to be initiated, throw error statement.  Do nothing
     Serial.println("Data file unable to initiated.;"); 
   } else {                                                      
@@ -495,8 +496,10 @@ float calculateVelocity(struct stateStruct rawState)  { //VARIABLES NEEDED FOR C
 
   velocity = (leftSide + rightSide);                            //Calculates final velocity value by summing the left and right sides of the equation
   if isnan(velocity) {                                          //logs error if velocity value is given as nan
+    #if !DEBUG_READFROMFILE
     Serial.println("vel is nan!");
     logError("vel is nan!");
+    #endif
     velocity = 0;                                               //Sets returned velocity to zero to minimize damage from egregious reading.
   }
   if ((velocity > MAX_EXP_VEL) || (velocity < -10)) {           //logs error if velocity value is egregiously too high or low.
@@ -706,7 +709,7 @@ float getAcceleration(void) {
 
   magG = pow(((xG*xG)+(yG*yG)+(zG*zG)),0.5);                                       //Calculates magnitude of acceleration from gravity vector.
 
-  verticalAcceleration = (linearDotGravity / magG) - 9.81;                                 //Finds the acceleration in the direction of gravity.
+  verticalAcceleration = linearDotGravity / 9.81 - 9.81;                                 //Finds the acceleration in the direction of gravity.
 
   storeInfo(xG);                                                                  //logs most recent x-component of acceleration by gravity to dataFile.
   storeInfo(yG);                                                                  //logs most recent y-component of acceleration by gravity to dataFile.
@@ -834,7 +837,7 @@ void testCalibration(void){
   bno.getCalibration(&system, &gyro, &accel, &mag);                               //Retrieves calibration values from sensor.
 
   if(accel < 3){                                                                  //If accelerometer is not calibrated, log in errorLog the occurance.
-    logError("Bno055 is not calibrated");
+    logError("n_cal");
   }
 } // END testCalibration
 
@@ -888,9 +891,6 @@ void kalman(int16_t encPos, struct stateStruct rawState, struct stateStruct* fil
   z_k[2] = rawState.accel;
 
   delta_t = rawState.time - lastTime;
-  Serial.println(""); //temp
-  Serial.print("delta t = ");
-  Serial.println(delta_t, 6);
   lastTime = rawState.time;
 
   b_k[0] = delta_t*delta_t;
@@ -925,8 +925,10 @@ void kalman(int16_t encPos, struct stateStruct rawState, struct stateStruct* fil
   }
   else if ((z_k[0] < 20) && (z_k[0] > -20)) {
     u_k = 0;
+    #if !TEST_MODE
     Serial.print("On the pad! Altitude = "); //errorlog
     Serial.println(z_k[0]);
+    #endif
   }
   if isnan(u_k) { //caused by velocity being nan //errorlog
     Serial.println("u_k is nan!");
@@ -1041,13 +1043,15 @@ Author: Jacob
 */
 /**************************************************************************/
 void storeInfo(float dataPoint){
-  File myFile = sd.open("VDSv2FlightData.dat", FILE_WRITE);
+  File myFile = sd.open(DATA_FILENAME, FILE_WRITE);
 
   if(myFile) {
     myFile.printf("%0.3f",dataPoint);
     myFile.print(",");
   } else {
-    Serial.print("Unable to open VDSv2FlightData.dat;");
+    Serial.print("Unable to open ");
+    Serial.print(DATA_FILENAME);
+    Serial.println(";");
     logError("Unable to open VDSv2FlightData.dat");
   }
   
@@ -1062,7 +1066,7 @@ Author: Jacob
 */
 /**************************************************************************/
 void storeStructs(struct stateStruct sensorData, struct stateStruct kalmanData){
-  File myFile = sd.open("VDSv2FlightData.dat", FILE_WRITE);
+  File myFile = sd.open(DATA_FILENAME, FILE_WRITE);
   #if !TEST_MODE                                                              //If we are using sensors for data acquisition, retrieve orientation values from bno055
   imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);        //Creates a vector which stores orientation values.
   #endif
@@ -1091,7 +1095,9 @@ void storeStructs(struct stateStruct sensorData, struct stateStruct kalmanData){
     myFile.printf("%0.3f",kalmanData.accel);
     myFile.println("");
   } else {                                                                    //If unable to open dataFile, log occurance within errorFile
-    Serial.print("Unable to open VDSv2FlightData.dat;");
+    Serial.print("Unable to open ");
+    Serial.print(DATA_FILENAME);
+    Serial.println(";");
     logError("Unable to open VDSv2FlightData.dat");
   }
     myFile.close();
@@ -1108,14 +1114,19 @@ void readFromFile(struct stateStruct* destination){
   File myFile = sd.open(TEST_FILENAME, FILE_READ);
   char place = '\n';
   char number[20] = {'\0'};
-  short numPlace = 0, numCount = 0;
+  short numPlace = 0, numCount = 0, commaCount = 0;
   float value = 0;
-  int lineCount = 0;
-  static int linePlaceHolder = 0;
+  int lineCount = -1;
+  bool firstLine = true;
+  static int linePlaceHolder = 1;
 
   if(myFile){
     while(myFile.available()) {
       place = myFile.read();
+
+//      Serial.print("Place: ");
+//      Serial.print(place);
+//      Serial.println(";");
 
       if(isdigit(place)){
         number[numPlace] = place;
@@ -1126,50 +1137,93 @@ void readFromFile(struct stateStruct* destination){
       } else if (place == 'e' || place == '+') {
         number[numPlace] = place;
       } else if (place == ','){
-        value = numToFloat(number);
-        numCount++;
         numPlace = -1;
-        switch(numCount-(lineCount*3)){
-        case 1:
-          destination->time = (value);
-          break;
-          
-        case 2:
-          destination->alt = value;
-          break;
+        commaCount++;
+//        Serial.print("\nnumber: ");
+//        for(int i = 0; number[i] != '\0'; i++)
+//          Serial.print(number[i]);
+//        Serial.println(";");
+        if(firstLine){
+          if(commaCount == 17){
+            firstLine = false;
+          }
+        } else {
+          value = numToFloat(number);
+          numPlace = -1;
+            #if DEBUG_READFROMFILE
+            Serial.print("linePlaceHolder: ");
+            Serial.print(linePlaceHolder);
+            Serial.print("     lineCount: ");
+            Serial.print(lineCount);
+            Serial.print("     numCount: ");
+            Serial.print(numCount);
+            Serial.print("     commaCount: ");
+            Serial.print(commaCount);
+            Serial.print("     value: ");
+            Serial.print(value);
+            Serial.println(";");
+            #endif
+          if(commaCount == 12 || commaCount == 13 || commaCount == 15){
+            numCount++;
+            switch(numCount){
+            case 1:
+              destination->time = value;
+              Serial.print("\n\nTime value found!!!!");
+              Serial.print(value);
+              Serial.print("\n\n");
+              break;
+              
+            case 2:
+              destination->alt = value;
+              Serial.print("\n\nAlt value found!!!!");
+              Serial.print(value);
+              Serial.print("\n\n");
+              break;
+  
+            case 3:
+              destination->accel = value + 9.81;
+              Serial.print("\n\nAccel value found!!!!");
+              Serial.print(value);
+              Serial.print("\n\n");
+              break;
+            }
+          } 
         }
         resetNumber(number);
       } else {
-        value = numToFloat(number);
-        numCount++;
-        numPlace = -1;
-        resetNumber(number);
-        lineCount++;
-        destination->accel = (value*-1);
       }
 
-      if(numCount == 0) {
-        
-      } else {
-        if((numCount % ((linePlaceHolder+1)*3)) == 0){
-#if DEBUG_READFROMFILE
-      Serial.println("");
-      Serial.print("Time: ");
-      Serial.print(destination->time);
-        Serial.print(";");
-      Serial.print("Altitude: ");
-      Serial.print(destination->alt);
-      Serial.print(";");
-      Serial.print("Acceleration: ");
-      Serial.print(destination->accel);
-      Serial.print(";");
-#endif
-          linePlaceHolder++;
-          break;
-        }
+      if(numCount == 3 && lineCount == (linePlaceHolder)) {
+        Serial.print("\n\nlineCount: ");
+        Serial.print(lineCount);
+        Serial.print("\n\n");
+
+        Serial.print("\n\nlinePlaceHolder: ");
+        Serial.print(linePlaceHolder);
+        Serial.print("\n\n");
+
+        #if DEBUG_READFROMFILE
+           Serial.println("");
+           Serial.print("Time: ");
+           Serial.print(destination->time);
+           Serial.print(";");
+           Serial.print("Altitude: ");
+           Serial.print(destination->alt);
+           Serial.print(";");
+           Serial.print("Acceleration: ");
+           Serial.print(destination->accel);
+           Serial.println(";");
+        #endif
+            linePlaceHolder++;
+            break;
       }
-      numPlace++;
       
+      if(commaCount == 17){
+        commaCount = 0;
+        lineCount++;
+      }
+
+      numPlace++;
     }
 
     myFile.close();
