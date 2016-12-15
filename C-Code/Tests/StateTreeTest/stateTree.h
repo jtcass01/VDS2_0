@@ -12,7 +12,7 @@ struct stateTree* createStateTree(int);
 void deleteStateTree(struct stateTree*);
 void initializeTree(struct stateTree*);
 void insert(const int, struct stateTree*);
-void insertState(const int, struct state*);
+void insertState(const int, struct state**);
 void printTree(struct stateTree*);
 void printBranch(struct state*);
 
@@ -51,20 +51,22 @@ void initializeTree(struct stateTree* pStateTree){
 
 
 void insert(const int pos, struct stateTree* pStateTree){
+  struct state** pRoot = &(pStateTree->root);
+
   printf("\n\nInserting into binary tree...");
-  insertState(pos, pStateTree->root);
+  insertState(pos, pRoot);
   printTree(pStateTree);
 }
 
-void insertState(const int pos, struct state* pState){
-  if(pState == NULL){
-    pState = createState(pos);
-  } else if (pos < pState->position){
-    insertState(pos, pState->leftChild);
-  } else if (pos > pState->position){
-    insertState(pos, pState->rightChild);
+void insertState(const int pos, struct state** pState){
+  if(*pState == NULL){
+    (*pState) = createState(pos);
+  } else if (pos < (*pState)->position){
+    insertState(pos, &(*pState)->leftChild);
+  } else if (pos > (*pState)->position){
+    insertState(pos, &(*pState)->rightChild);
   }
-  printState(pState);
+  printState((*pState));
 }
 
 
