@@ -124,3 +124,27 @@ Additionally, I created a menu for the program which is updated and uniform.  Fu
 sections including the BNO055, BMP180, and Kalman Filter.  To see the whiteboards with my calculations today please see 11.29.2016.jpg
 in the ReferenceImages folder.
   - Jacob Taylor Cassady
+
+Entry 1 - 12/3/2016:
+  Subscale launch today was mostly a success.  There was a failure in our main parachutes deployment and our acceleration equations
+included an additional subtraction of 9.81 which scewed some of our velocity and kalman results.  Luckyily, our VDS program is robust
+and is able to run off past sensor data to resimulate a flight.  We will rerun the flight by adding 9.81 to each acceleration value.
+Overall we are very happy with the results from our launch.  Our next subscale launch is 12/19/2016.  We hope to rememdy the recovery
+and equation issues by then.
+  - Jacob Taylor Cassady
+
+Entry 1 - 12/10/2016:
+  The team has been focusing on finals.  I have written a binary tree system for us to log our data.  This will be much more efficient 
+store and retrieve data at a rate of nlog(n) when using large data sets instead of being constrained to the O(n) we currently have.
+I haven't been able to make it to the garage to implement this on the teensy, but I can't wait to see it in action.  You can view the
+c code test and headerfiles I wrote at https://github.com/jtcass01/VDS2_0/tree/master/C-Code/Tests/StateTreeTest.
+  - Jacob Taylor Cassady
+  
+Entry 1 - 12/14/2016:
+  Saddly, my header files are not integrating like I had imagined.  The program freezes anytime a function from the header file is
+called.  Alex Bennet, an electrical/computer engineer on the payload team (drone) said he was going to help me trace where the error
+is occuring.  Right now I believe it has to do with my memory allocation. Alex said he has been able use memory allocation on the
+teensy before.  I am confident I will be able to make it work eventually, but it will take more work than I had anticipated.  Also,
+Ben Stringer and I talked and we decided I could work on the java GUI for the VDS while on my internship at NASA.  This way I can focus
+on the C code and CDR documentation over winter break.
+  - Jacob Taylor Cassady
