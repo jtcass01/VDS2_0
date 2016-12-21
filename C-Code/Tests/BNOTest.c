@@ -108,23 +108,12 @@ float getVerticalAcceleration(void){
   
   linearDotGravity = (xG*xL)+(yG*yL)+(zG*zL);
 
-  magL = pow(((xL*xL)+(yL*yL)+(zL*zL)),0.5);
   magG = pow(((xG*xG)+(yG*yG)+(zG*zG)),.5);
 
-  defOfProduct = linearDotGravity / (magL*magG);
+  verticalAcceleration = linearDotGravity / magG;
 
-  theta = acos(defOfProduct);
-  theta = (theta*180)/PI;
+   return verticalAcceleration;
 
-  magOfVerticalAcceleration = linearDotGravity / magG;
-
-  if(90 < theta || theta < 270){
-    verticalAcceleration = magOfVerticalAcceleration;
-  } else {
-    verticalAcceleration = magOfVerticalAcceleration * -1;
-  }
-
-  return verticalAcceleration;
 //  Serial.print("Acceleration of gravity: (");
 //  Serial.print(xG);
 //  Serial.print(",");
